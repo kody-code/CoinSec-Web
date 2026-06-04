@@ -83,19 +83,20 @@ async function handleDelete(id: number) {
       <div v-if="filtered.length === 0" class="empty">暂无分类</div>
     </div>
 
-    <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
-      <div class="modal-card">
-        <h3>{{ editing ? '编辑分类' : '新增分类' }}</h3>
-        <div class="modal-body">
-          <input v-model="form.name" placeholder="分类名称" class="modal-input" />
-          <input v-model="form.icon" placeholder="图标名称（如 restaurant）" class="modal-input" />
-        </div>
-        <div class="modal-footer">
-          <button class="modal-btn cancel" @click="showForm = false">取消</button>
-          <button class="modal-btn confirm" :disabled="loading" @click="save">保存</button>
-        </div>
-      </div>
-    </div>
+    <el-dialog v-model="showForm" :title="editing ? '编辑分类' : '新增分类'" width="380px">
+      <el-form label-width="60px">
+        <el-form-item label="名称">
+          <el-input v-model="form.name" placeholder="如：餐饮" />
+        </el-form-item>
+        <el-form-item label="图标">
+          <el-input v-model="form.icon" placeholder="图标名称（如 restaurant）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showForm = false">取消</el-button>
+        <el-button type="primary" :loading="loading" @click="save">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -238,71 +239,5 @@ async function handleDelete(id: number) {
   padding: 40px;
 }
 
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  backdrop-filter: blur(4px);
-}
 
-.modal-card {
-  background: #fff;
-  border-radius: 20px;
-  padding: 24px;
-  width: 360px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-}
-
-.modal-card h3 {
-  font-size: 17px;
-  font-weight: 600;
-  margin: 0 0 16px;
-  color: var(--text-primary);
-}
-
-.modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.modal-input {
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  font-size: 14px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.modal-input:focus {
-  border-color: var(--accent);
-}
-
-.modal-footer {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.modal-btn {
-  padding: 8px 20px;
-  border-radius: 10px;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.modal-btn.cancel { background: #f1f5f9; color: #64748b; }
-.modal-btn.confirm { background: var(--accent); color: #fff; }
-.modal-btn.confirm:hover { box-shadow: 0 4px 12px var(--accent-glow); }
 </style>
