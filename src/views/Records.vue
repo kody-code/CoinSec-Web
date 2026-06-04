@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRecords } from '@/api/record'
 import { getCategories } from '@/api/category'
+import CategoryIcon from '@/components/CategoryIcon.vue'
 import type { RecordItem, Category } from '@/types'
 
 const router = useRouter()
@@ -12,6 +13,12 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
+
+const categoryIconMap = computed(() => {
+  const map: Record<number, string> = {}
+  categories.value.forEach(c => { map[c.categoryId] = c.icon })
+  return map
+})
 
 const filters = ref({
   type: '' as string,
@@ -108,7 +115,14 @@ onMounted(async () => {
     </el-card>
 
     <el-table :data="records" v-loading="loading" stripe style="width: 100%">
-      <el-table-column prop="categoryName" label="分类" width="120" />
+      <el-table-column label="分类" width="140">
+        <template #default="{ row }">
+          <div class="category-cell">
+            <CategoryIcon :icon="categoryIconMap[row.categoryId] || 'help'" :size="16" />
+            <span>{{ row.categoryName }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="类型" width="80">
         <template #default="{ row }">
           <el-tag :type="row.type === 'expense' ? 'danger' : 'success'" size="small">
@@ -171,6 +185,12 @@ onMounted(async () => {
   margin-top: 16px;
   display: flex;
   justify-content: center;
+}
+
+.category-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .income {

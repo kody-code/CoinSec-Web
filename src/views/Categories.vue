@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
 import type { Category } from '@/types'
+import CategoryIcon from '@/components/CategoryIcon.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const categories = ref<Category[]>([])
@@ -96,7 +97,7 @@ onMounted(fetchCategories)
       <div class="category-list">
         <div v-for="cat in filteredCategories" :key="cat.categoryId" class="category-item">
           <div class="cat-left">
-            <span class="cat-icon">{{ cat.icon }}</span>
+            <CategoryIcon :icon="cat.icon" />
             <span class="cat-name">{{ cat.name }}</span>
           </div>
           <div class="cat-actions">
