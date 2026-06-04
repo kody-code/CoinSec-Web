@@ -5,159 +5,174 @@ import { updateNickname, updatePassword } from '@/api/user'
 import { ElMessage } from 'element-plus'
 
 const auth = useAuthStore()
+const nickVal = ref('')
+const pwForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const nickLoading = ref(false)
+const pwLoading = ref(false)
 
-const nicknameForm = ref({
-  nickname: '',
-})
-
-const passwordForm = ref({
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-})
-
-const nicknameLoading = ref(false)
-const passwordLoading = ref(false)
-
-async function handleNickname() {
-  if (!nicknameForm.value.nickname) {
-    ElMessage.warning('请输入昵称')
-    return
-  }
-  nicknameLoading.value = true
+async function saveNickname() {
+  if (!nickVal.value) { ElMessage.warning('请输入昵称'); return }
+  nickLoading.value = true
   try {
-    await updateNickname(nicknameForm.value)
+    await updateNickname({ nickname: nickVal.value })
     await auth.fetchUser()
     ElMessage.success('昵称已更新')
-  } finally {
-    nicknameLoading.value = false
-  }
+  } finally { nickLoading.value = false }
 }
 
-async function handlePassword() {
-  if (!passwordForm.value.oldPassword || !passwordForm.value.newPassword) {
-    ElMessage.warning('请填写完整信息')
-    return
-  }
-  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
-    ElMessage.warning('两次密码不一致')
-    return
-  }
-  passwordLoading.value = true
+async function savePassword() {
+  if (!pwForm.value.oldPassword || !pwForm.value.newPassword) { ElMessage.warning('请填写完整'); return }
+  if (pwForm.value.newPassword !== pwForm.value.confirmPassword) { ElMessage.warning('两次密码不一致'); return }
+  pwLoading.value = true
   try {
-    await updatePassword({
-      oldPassword: passwordForm.value.oldPassword,
-      newPassword: passwordForm.value.newPassword,
-    })
+    await updatePassword({ oldPassword: pwForm.value.oldPassword, newPassword: pwForm.value.newPassword })
     ElMessage.success('密码已修改')
-    passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
-  } finally {
-    passwordLoading.value = false
-  }
+    pwForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+  } finally { pwLoading.value = false }
 }
 
-onMounted(() => {
-  if (auth.user) {
-    nicknameForm.value.nickname = auth.user.nickname || ''
-  }
-})
+onMounted(() => { if (auth.user) nickVal.value = auth.user.nickname || '' })
 </script>
 
 <template>
   <div class="profile-page">
-    <div class="page-header">
-      <h2>个人中心</h2>
+    <div class="profile-hero">
+      <div class="profile-avatar">{{ auth.user?.nickname?.charAt(0) || 'U' }}</div>
+      <div class="profile-info">
+        <h2>{{ auth.user?.nickname || '用户' }}</h2>
+        <p>@{{ auth.user?.username }}</p>
+      </div>
     </div>
 
-    <el-card class="profile-card">
-      <div class="user-info">
-        <el-avatar :size="64" class="user-avatar">
-          {{ auth.user?.nickname?.charAt(0) || 'U' }}
-        </el-avatar>
-        <div class="user-detail">
-          <div class="user-nickname">{{ auth.user?.nickname || '用户' }}</div>
-          <div class="user-username">@{{ auth.user?.username }}</div>
-        </div>
+    <div class="section-card">
+      <div class="section-title">修改昵称</div>
+      <div class="section-body">
+        <input v-model="nickVal" placeholder="新昵称" class="field-input" />
+        <button class="save-btn" :disabled="nickLoading" @click="saveNickname">
+          {{ nickLoading ? '保存中...' : '保存' }}
+        </button>
       </div>
-    </el-card>
+    </div>
 
-    <el-card class="section-card">
-      <template #header>修改昵称</template>
-      <el-form :model="nicknameForm" label-width="80px">
-        <el-form-item label="昵称">
-          <el-input v-model="nicknameForm.nickname" placeholder="输入新昵称" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="nicknameLoading" @click="handleNickname">
-            保存
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card class="section-card">
-      <template #header>修改密码</template>
-      <el-form :model="passwordForm" label-width="100px">
-        <el-form-item label="原密码">
-          <el-input v-model="passwordForm.oldPassword" type="password" show-password />
-        </el-form-item>
-        <el-form-item label="新密码">
-          <el-input v-model="passwordForm.newPassword" type="password" show-password />
-        </el-form-item>
-        <el-form-item label="确认密码">
-          <el-input v-model="passwordForm.confirmPassword" type="password" show-password />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="passwordLoading" @click="handlePassword">
-            修改
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+    <div class="section-card">
+      <div class="section-title">修改密码</div>
+      <div class="section-body stacked">
+        <input v-model="pwForm.oldPassword" type="password" placeholder="原密码" class="field-input" />
+        <input v-model="pwForm.newPassword" type="password" placeholder="新密码" class="field-input" />
+        <input v-model="pwForm.confirmPassword" type="password" placeholder="确认密码" class="field-input" />
+        <button class="save-btn" :disabled="pwLoading" @click="savePassword">
+          {{ pwLoading ? '修改中...' : '修改密码' }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .profile-page {
-  max-width: 600px;
+  max-width: 420px;
   margin: 0 auto;
 }
 
-.page-header {
-  margin-bottom: 16px;
-}
-
-.page-header h2 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.profile-card {
-  margin-bottom: 16px;
-}
-
-.user-info {
+.profile-hero {
   display: flex;
   align-items: center;
   gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  border-radius: 20px;
+  color: #fff;
 }
 
-.user-avatar {
-  background: #409eff;
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  flex-shrink: 0;
+  backdrop-filter: blur(4px);
 }
 
-.user-nickname {
-  font-size: 18px;
+.profile-info h2 {
+  font-size: 20px;
   font-weight: 600;
+  margin: 0;
 }
 
-.user-username {
+.profile-info p {
   font-size: 14px;
-  color: #999;
-  margin-top: 4px;
+  opacity: 0.7;
+  margin: 4px 0 0;
 }
 
 .section-card {
-  margin-bottom: 16px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 14px;
+}
+
+.section-body {
+  display: flex;
+  gap: 10px;
+}
+
+.section-body.stacked {
+  flex-direction: column;
+}
+
+.field-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  color: var(--text-primary);
+}
+
+.field-input:focus {
+  border-color: var(--accent);
+}
+
+.save-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.save-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

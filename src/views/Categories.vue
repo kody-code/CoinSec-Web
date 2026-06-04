@@ -1,191 +1,308 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
-import type { Category } from '@/types'
 import CategoryIcon from '@/components/CategoryIcon.vue'
+import type { Category } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const categories = ref<Category[]>([])
 const activeTab = ref('expense')
 const loading = ref(false)
-const dialogVisible = ref(false)
+const showForm = ref(false)
 const editing = ref<Category | null>(null)
+const form = ref({ name: '', icon: '' })
 
-const form = ref({
-  name: '',
-  type: 'expense' as string,
-  icon: '',
-  sort: 0,
-})
+const filtered = ref<Category[]>([])
 
-const filteredCategories = ref<Category[]>([])
-
-function filterCategories() {
-  filteredCategories.value = categories.value.filter((c) => c.type === activeTab.value)
+function filter() {
+  filtered.value = categories.value.filter(c => c.type === activeTab.value)
 }
 
-async function fetchCategories() {
+async function fetch() {
   const res = await getCategories()
   categories.value = res.data.data
-  filterCategories()
+  filter()
 }
 
 function openCreate() {
   editing.value = null
-  form.value = { name: '', type: activeTab.value, icon: '', sort: 0 }
-  dialogVisible.value = true
+  form.value = { name: '', icon: '' }
+  showForm.value = true
 }
 
 function openEdit(cat: Category) {
   editing.value = cat
-  form.value = { name: cat.name, type: cat.type, icon: cat.icon, sort: cat.sort }
-  dialogVisible.value = true
+  form.value = { name: cat.name, icon: cat.icon }
+  showForm.value = true
 }
 
-async function handleSave() {
-  if (!form.value.name) {
-    ElMessage.warning('请输入分类名称')
-    return
-  }
+async function save() {
+  if (!form.value.name) { ElMessage.warning('请输入名称'); return }
   loading.value = true
   try {
     if (editing.value) {
       await updateCategory(editing.value.categoryId, { name: form.value.name, icon: form.value.icon || undefined })
     } else {
-      await createCategory({ name: form.value.name, type: form.value.type, icon: form.value.icon, sort: form.value.sort })
+      await createCategory({ name: form.value.name, type: activeTab.value, icon: form.value.icon, sort: 0 })
     }
-    ElMessage.success(editing.value ? '修改成功' : '创建成功')
-    dialogVisible.value = false
-    fetchCategories()
-  } finally {
-    loading.value = false
-  }
+    showForm.value = false
+    ElMessage.success(editing.value ? '已更新' : '已创建')
+    fetch()
+  } finally { loading.value = false }
 }
 
 async function handleDelete(id: number) {
   try {
-    await ElMessageBox.confirm('确定删除该分类？')
+    await ElMessageBox.confirm('确定删除？')
     await deleteCategory(id)
     ElMessage.success('已删除')
-    fetchCategories()
-  } catch {
-    // cancelled
-  }
+    fetch()
+  } catch {}
 }
-
-function handleTabChange(tab: string) {
-  activeTab.value = tab
-  filterCategories()
-}
-
-onMounted(fetchCategories)
 </script>
 
 <template>
-  <div class="categories-page">
-    <div class="page-header">
-      <h2>分类管理</h2>
-      <el-button type="primary" @click="openCreate">+ 新增</el-button>
+  <div class="cat-page">
+    <div class="tab-bar">
+      <button :class="['tab-btn', { active: activeTab === 'expense' }]" @click="activeTab = 'expense'; filter()">支出</button>
+      <button :class="['tab-btn', { active: activeTab === 'income' }]" @click="activeTab = 'income'; filter()">收入</button>
+      <button class="add-tab-btn" @click="openCreate">+</button>
     </div>
 
-    <el-card>
-      <el-tabs :model-value="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="支出" name="expense" />
-        <el-tab-pane label="收入" name="income" />
-      </el-tabs>
-
-      <div class="category-list">
-        <div v-for="cat in filteredCategories" :key="cat.categoryId" class="category-item">
-          <div class="cat-left">
-            <CategoryIcon :icon="cat.icon" />
-            <span class="cat-name">{{ cat.name }}</span>
-          </div>
-          <div class="cat-actions">
-            <el-button text type="primary" size="small" @click="openEdit(cat)">编辑</el-button>
-            <el-button text type="danger" size="small" @click="handleDelete(cat.categoryId)">删除</el-button>
-          </div>
+    <div class="cat-grid">
+      <div v-for="cat in filtered" :key="cat.categoryId" class="cat-item">
+        <div class="cat-icon-wrap" :class="cat.type">
+          <CategoryIcon :icon="cat.icon" :size="24" />
         </div>
-        <div v-if="filteredCategories.length === 0" class="empty-text">暂无分类</div>
+        <span class="cat-name">{{ cat.name }}</span>
+        <div class="cat-actions">
+          <button class="min-btn" @click="openEdit(cat)">✎</button>
+          <button class="min-btn danger" @click="handleDelete(cat.categoryId)">✕</button>
+        </div>
       </div>
-    </el-card>
+      <div v-if="filtered.length === 0" class="empty">暂无分类</div>
+    </div>
 
-    <el-dialog
-      v-model="dialogVisible"
-      :title="editing ? '编辑分类' : '新增分类'"
-      width="400px"
-    >
-      <el-form label-width="80px">
-        <el-form-item label="名称">
-          <el-input v-model="form.name" placeholder="如：餐饮" />
-        </el-form-item>
-        <el-form-item label="图标">
-          <el-input v-model="form.icon" placeholder="图标名称（可选）" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="loading" @click="handleSave">保存</el-button>
-      </template>
-    </el-dialog>
+    <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
+      <div class="modal-card">
+        <h3>{{ editing ? '编辑分类' : '新增分类' }}</h3>
+        <div class="modal-body">
+          <input v-model="form.name" placeholder="分类名称" class="modal-input" />
+          <input v-model="form.icon" placeholder="图标名称（如 restaurant）" class="modal-input" />
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn cancel" @click="showForm = false">取消</button>
+          <button class="modal-btn confirm" :disabled="loading" @click="save">保存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.categories-page {
-  max-width: 600px;
+.cat-page {
+  max-width: 480px;
   margin: 0 auto;
 }
 
-.page-header {
+.tab-bar {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin-bottom: 20px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
 }
 
-.page-header h2 {
-  margin: 0;
-  font-size: 20px;
+.tab-btn {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s;
 }
 
-.category-list {
-  margin-top: 16px;
+.tab-btn.active {
+  background: #fff;
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
-.category-item {
+.add-tab-btn {
+  width: 36px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 18px;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.add-tab-btn:hover {
+  background: #eef2ff;
+}
+
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.cat-item {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  gap: 6px;
+  padding: 16px 10px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  position: relative;
+  transition: all 0.2s;
 }
 
-.category-item:last-child {
-  border-bottom: none;
+.cat-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
-.cat-left {
+.cat-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
 }
 
-.cat-icon {
-  font-size: 20px;
+.cat-icon-wrap.expense {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.cat-icon-wrap.income {
+  background: #ecfdf5;
+  color: #10b981;
 }
 
 .cat-name {
-  font-size: 15px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .cat-actions {
-  display: flex;
-  gap: 4px;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  gap: 2px;
 }
 
-.empty-text {
+.cat-item:hover .cat-actions {
+  display: flex;
+}
+
+.min-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  background: #f1f5f9;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.min-btn:hover { background: #e2e8f0; }
+.min-btn.danger { color: #ef4444; }
+.min-btn.danger:hover { background: #fef2f2; }
+
+.empty {
+  grid-column: 1 / -1;
   text-align: center;
-  color: #999;
+  color: var(--text-secondary);
   padding: 40px;
 }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+
+.modal-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  width: 360px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+
+.modal-card h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--text-primary);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.modal-input {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.modal-input:focus {
+  border-color: var(--accent);
+}
+
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 8px 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-btn.cancel { background: #f1f5f9; color: #64748b; }
+.modal-btn.confirm { background: var(--accent); color: #fff; }
+.modal-btn.confirm:hover { box-shadow: 0 4px 12px var(--accent-glow); }
 </style>
