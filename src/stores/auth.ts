@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getUserInfo } from '@/api/user'
+import { logout as logoutApi } from '@/api/auth'
 import type { UserInfo } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -25,9 +26,17 @@ export const useAuthStore = defineStore('auth', () => {
       isLoggedIn.value = true
       return true
     } catch {
-      clearToken()
       return false
     }
+  }
+
+  async function logout() {
+    try {
+      await logoutApi()
+    } catch {
+      // ignore logout API errors, clear local state anyway
+    }
+    clearToken()
   }
 
   function checkLogin() {
@@ -39,5 +48,5 @@ export const useAuthStore = defineStore('auth', () => {
     return false
   }
 
-  return { user, isLoggedIn, setToken, clearToken, fetchUser, checkLogin }
+  return { user, isLoggedIn, setToken, clearToken, fetchUser, logout, checkLogin }
 })

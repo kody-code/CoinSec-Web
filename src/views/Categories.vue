@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
 import CategoryIcon from '@/components/CategoryIcon.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { Category } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -19,9 +20,13 @@ function filter() {
 }
 
 async function fetch() {
-  const res = await getCategories()
-  categories.value = res.data.data
-  filter()
+  try {
+    const res = await getCategories()
+    categories.value = res.data.data
+    filter()
+  } catch {
+    // 401 handled by interceptor redirect
+  }
 }
 
 function openCreate() {
@@ -59,6 +64,8 @@ async function handleDelete(id: number) {
     fetch()
   } catch {}
 }
+
+onMounted(fetch)
 </script>
 
 <template>
@@ -80,7 +87,7 @@ async function handleDelete(id: number) {
           <button class="min-btn danger" @click="handleDelete(cat.categoryId)">✕</button>
         </div>
       </div>
-      <div v-if="filtered.length === 0" class="empty">暂无分类</div>
+      <EmptyState v-if="filtered.length === 0" text="暂无分类" icon="category" />
     </div>
 
     <el-dialog v-model="showForm" :title="editing ? '编辑分类' : '新增分类'" width="380px">
@@ -101,16 +108,11 @@ async function handleDelete(id: number) {
 </template>
 
 <style scoped>
-.cat-page {
-  max-width: 480px;
-  margin: 0 auto;
-}
-
 .tab-bar {
   display: flex;
   gap: 6px;
   margin-bottom: 20px;
-  background: #f1f5f9;
+  background: var(--border-light);
   padding: 4px;
   border-radius: 12px;
 }
@@ -125,7 +127,7 @@ async function handleDelete(id: number) {
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  color: #64748b;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
@@ -149,12 +151,12 @@ async function handleDelete(id: number) {
 }
 
 .add-tab-btn:hover {
-  background: #eef2ff;
+  background: var(--accent-bg);
 }
 
 .cat-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 8px;
 }
 
@@ -186,13 +188,13 @@ async function handleDelete(id: number) {
 }
 
 .cat-icon-wrap.expense {
-  background: #fef2f2;
-  color: #ef4444;
+  background: var(--expense-bg);
+  color: var(--expense);
 }
 
 .cat-icon-wrap.income {
-  background: #ecfdf5;
-  color: #10b981;
+  background: var(--income-bg);
+  color: var(--income);
 }
 
 .cat-name {
@@ -220,23 +222,21 @@ async function handleDelete(id: number) {
   border: none;
   font-size: 11px;
   cursor: pointer;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--border-light);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
 }
 
-.min-btn:hover { background: #e2e8f0; }
-.min-btn.danger { color: #ef4444; }
-.min-btn.danger:hover { background: #fef2f2; }
+.min-btn:hover { background: var(--border); }
+.min-btn.danger { color: var(--expense); }
+.min-btn.danger:hover { background: var(--expense-bg); }
 
-.empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  color: var(--text-secondary);
-  padding: 40px;
+@media (max-width: 768px) {
+  .cat-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+  .cat-actions { display: flex !important; }
 }
 
 

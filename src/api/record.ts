@@ -25,6 +25,21 @@ export function createRecord(data: {
   return request.post<ApiResult<{ recordId: number }>>('/records', data)
 }
 
+export function updateRecord(id: number, data: {
+  categoryId: number
+  accountId: number
+  type: string
+  amount: number
+  remark?: string
+  recordTime?: string
+}) {
+  return request.put<ApiResult<RecordItem>>(`/records/${id}`, data)
+}
+
+export function deleteRecord(id: number) {
+  return request.delete<ApiResult<void>>(`/records/${id}`)
+}
+
 export function getStatistics(startDate: string, endDate: string) {
   return request.get<ApiResult<Statistics>>('/records/statistics', {
     params: { startDate, endDate },

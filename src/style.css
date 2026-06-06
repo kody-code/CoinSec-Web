@@ -11,7 +11,7 @@ html, body, #app {
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f8f9fc;
+  background: var(--bg);
 }
 
 :root {
@@ -21,15 +21,31 @@ html, body, #app {
   --sidebar-text: rgba(255, 255, 255, 0.55);
   --sidebar-text-active: #fff;
   --accent: #6366f1;
+  --accent-dark: #4f46e5;
   --accent-light: #818cf8;
+  --accent-purple: #a855f7;
+  --accent-deep: #7c3aed;
   --accent-glow: rgba(99, 102, 241, 0.3);
+  --accent-bg: #eef2ff;
   --income: #10b981;
+  --income-dark: #059669;
+  --income-light: #34d399;
+  --income-bg: #ecfdf5;
   --expense: #ef4444;
+  --expense-light: #f87171;
+  --expense-bg: #fef2f2;
+  --warning: #f59e0b;
+  --warning-dark: #d97706;
+  --warning-light: #fbbf24;
   --card-bg: #ffffff;
   --card-radius: 16px;
+  --bg: #f8f9fc;
   --text-primary: #1e293b;
+  --text-dark: #334155;
   --text-secondary: #64748b;
+  --text-hint: #cbd5e1;
   --border-light: #f1f5f9;
+  --border: #e2e8f0;
 }
 
 /* Scrollbar */
@@ -43,3 +59,12 @@ html, body, #app {
 .el-card { border-radius: var(--card-radius) !important; border: none !important; box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important; }
 .el-table { border-radius: 12px; overflow: hidden; }
 .el-pagination { --el-pagination-button-width: 32px; --el-pagination-button-height: 32px; }
+.el-dialog { border-radius: 20px !important; overflow: hidden; }
+.el-dialog__header { padding: 24px 24px 0 !important; }
+.el-dialog__title { font-size: 17px !important; font-weight: 600 !important; color: var(--text-primary) !important; }
+.el-dialog__body { padding: 20px 24px !important; }
+.el-dialog__footer { padding: 0 24px 20px !important; }
+.el-overlay { backdrop-filter: blur(4px); }
+.el-button--primary { background: linear-gradient(135deg, var(--accent), #a855f7) !important; border: none !important; border-radius: 10px !important; font-weight: 600 !important; }
+.el-button--primary:hover { opacity: 0.9 !important; }
+.el-button--default { border-radius: 10px !important; }

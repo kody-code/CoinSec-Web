@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAccounts } from '@/api/account'
-import { getRecords } from '@/api/record'
-import { getStatistics } from '@/api/record'
+import { getRecords, getStatistics } from '@/api/record'
+import { formatMoney, formatDate, formatDateGroup } from '@/utils/format'
+import { accountColorList } from '@/utils/colors'
+import StatCard from '@/components/StatCard.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import CategoryIcon from '@/components/CategoryIcon.vue'
 import type { Account, RecordItem, Statistics } from '@/types'
 
 const router = useRouter()
@@ -13,19 +18,19 @@ const recentRecords = ref<RecordItem[]>([])
 const stats = ref<Statistics | null>(null)
 const loading = ref(true)
 
-function formatMoney(val: number) {
-  const prefix = val >= 0 ? '' : '-'
-  return prefix + '¥' + Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-}
-
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr)
-  const month = d.getMonth() + 1
-  const day = d.getDate()
-  const hours = String(d.getHours()).padStart(2, '0')
-  const mins = String(d.getMinutes()).padStart(2, '0')
-  return `${month}月${day}日 ${hours}:${mins}`
-}
+const groupedRecords = computed(() => {
+  const groups: { date: string; items: RecordItem[] }[] = []
+  let lastDate = ''
+  for (const r of recentRecords.value) {
+    const date = formatDateGroup(r.recordTime)
+    if (date !== lastDate) {
+      groups.push({ date, items: [] })
+      lastDate = date
+    }
+    groups[groups.length - 1].items.push(r)
+  }
+  return groups
+})
 
 onMounted(async () => {
   try {
@@ -35,12 +40,14 @@ onMounted(async () => {
 
     const [acctRes, recRes, statRes] = await Promise.all([
       getAccounts(),
-      getRecords({ page: 1, size: 5 }),
+      getRecords({ page: 1, size: 10 }),
       getStatistics(monthStart, today),
     ])
     accounts.value = acctRes.data.data
     recentRecords.value = recRes.data.data.content
     stats.value = statRes.data.data
+  } catch {
+    // 401 handled by interceptor redirect
   } finally {
     loading.value = false
   }
@@ -50,63 +57,34 @@ onMounted(async () => {
 <template>
   <div class="dashboard">
     <div class="stat-grid">
-      <div class="stat-card gradient-income">
-        <div class="stat-icon">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <div class="stat-label">本月收入</div>
-          <div class="stat-value">{{ stats ? formatMoney(stats.totalIncome) : '—' }}</div>
-        </div>
-      </div>
-
-      <div class="stat-card gradient-expense">
-        <div class="stat-icon">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <div class="stat-label">本月支出</div>
-          <div class="stat-value">{{ stats ? formatMoney(stats.totalExpense) : '—' }}</div>
-        </div>
-      </div>
-
-      <div class="stat-card gradient-balance">
-        <div class="stat-icon">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <div class="stat-label">结余</div>
-          <div class="stat-value">
-            {{ stats ? formatMoney(stats.totalIncome - stats.totalExpense) : '—' }}
-          </div>
-        </div>
-      </div>
+      <StatCard label="本月收入" :value="stats ? formatMoney(stats.totalIncome) : '—'" icon="up" variant="income" />
+      <StatCard label="本月支出" :value="stats ? formatMoney(stats.totalExpense) : '—'" icon="down" variant="expense" />
+      <StatCard label="结余" :value="stats ? formatMoney(stats.totalIncome - stats.totalExpense) : '—'" icon="balance" variant="balance" />
     </div>
 
-    <div class="content-grid">
-      <div class="section-card">
+    <div v-if="loading" class="loading-wrap">
+      <LoadingSkeleton :rows="2" />
+    </div>
+
+    <template v-else>
+      <div class="section-card" v-if="accounts.length > 0">
         <div class="section-header">
           <h3>账户概览</h3>
-          <button class="section-more" @click="router.push('/accounts')">查看全部</button>
+          <button class="section-more" @click="router.push('/accounts')">管理 →</button>
         </div>
-        <div class="section-body">
-          <div v-if="accounts.length === 0" class="empty-state">暂无账户</div>
+        <div class="account-grid">
           <div
             v-for="acct in accounts"
             :key="acct.accountId"
-            class="account-row"
+            class="account-card"
           >
-            <div class="account-info">
-              <div class="account-dot" :style="{ background: ['#6366f1','#10b981','#f59e0b','#ef4444'][acct.accountId % 4] }" />
-              <span class="account-name">{{ acct.name }}</span>
+            <div class="acct-avatar" :style="{ background: accountColorList[acct.accountId % 4] }">
+              <CategoryIcon :icon="acct.icon || 'wallet'" :size="22" />
             </div>
-            <span class="account-balance">{{ formatMoney(acct.balance) }}</span>
+            <div class="acct-detail">
+              <span class="acct-name">{{ acct.name }}</span>
+              <span class="acct-balance">{{ formatMoney(acct.balance) }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -114,43 +92,67 @@ onMounted(async () => {
       <div class="section-card">
         <div class="section-header">
           <h3>最近记录</h3>
-          <button class="section-more" @click="router.push('/records')">查看全部</button>
+          <button class="section-more" @click="router.push('/records')">查看全部 →</button>
         </div>
-        <div class="section-body">
-          <div v-if="recentRecords.length === 0" class="empty-state">暂无记录</div>
-          <div
-            v-for="record in recentRecords"
-            :key="record.recordId"
-            class="record-row"
-          >
-            <div class="record-left">
-              <div :class="['record-type-badge', record.type]">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-                  <path v-if="record.type === 'expense'" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                  <path v-else d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
+<EmptyState v-if="recentRecords.length === 0" text="还没有记录" action-text="记第一笔" @action="router.push('/records/new')" />
+        <template v-else>
+          <div v-for="group in groupedRecords" :key="group.date" class="record-group">
+            <div class="record-date">{{ group.date }}</div>
+            <div
+              v-for="record in group.items"
+              :key="record.recordId"
+              class="record-row"
+            >
+              <div class="record-left">
+                <div :class="['record-type-badge', record.type]">
+                  <svg v-if="record.type === 'expense'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                </div>
+                <div class="record-meta">
+                  <span class="record-category">{{ record.categoryName }}</span>
+                  <span class="record-sub">{{ record.accountName }}{{ record.remark ? ' · ' + record.remark : '' }}</span>
+                </div>
               </div>
-              <div class="record-meta">
-                <span class="record-category">{{ record.categoryName }}</span>
-                <span class="record-time">{{ formatDate(record.recordTime) }}</span>
-              </div>
+              <span :class="['record-amount', record.type]">
+                {{ record.type === 'expense' ? '-' : '+' }}{{ formatMoney(record.amount) }}
+              </span>
             </div>
-            <span :class="['record-amount', record.type]">
-              {{ record.type === 'expense' ? '-' : '+' }}{{ formatMoney(record.amount) }}
-            </span>
+          </div>
+        </template>
+      </div>
+
+      <div class="section-card" v-if="stats && stats.categoryStats && stats.categoryStats.length > 0">
+        <div class="section-header">
+          <h3>分类排行</h3>
+          <button class="section-more" @click="router.push('/statistics')">详情 →</button>
+        </div>
+        <div class="category-rank">
+          <div
+            v-for="(cat, idx) in stats.categoryStats.slice(0, 5)"
+            :key="cat.categoryId"
+            class="rank-item"
+          >
+            <span class="rank-index">{{ idx + 1 }}</span>
+            <span class="rank-name">{{ cat.categoryName }}</span>
+            <div class="rank-bar-wrap">
+              <div
+                class="rank-bar"
+                :style="{ width: (cat.total / Math.max(...stats.categoryStats.map(c => c.total))) * 100 + '%' }"
+              />
+            </div>
+            <span class="rank-amount">{{ formatMoney(cat.total) }}</span>
           </div>
         </div>
       </div>
-    </div>
+    </template>
+
+    <button class="fab" @click="router.push('/records/new')">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    </button>
   </div>
 </template>
 
 <style scoped>
-.dashboard {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -158,85 +160,8 @@ onMounted(async () => {
   margin-bottom: 24px;
 }
 
-.stat-card {
-  padding: 20px;
-  border-radius: 16px;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.15);
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -50%;
-  width: 100%;
-  height: 100%;
-  background: rgba(255,255,255,0.1);
-  border-radius: 50%;
-  transform: scale(0);
-  transition: transform 0.4s ease;
-}
-
-.stat-card:hover::before {
-  transform: scale(1);
-}
-
-.gradient-income {
-  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-}
-
-.gradient-expense {
-  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
-}
-
-.gradient-balance {
-  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
-}
-
-.stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  backdrop-filter: blur(4px);
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-label {
-  font-size: 13px;
-  opacity: 0.85;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-}
-
-.content-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+.loading-wrap {
+  margin-bottom: 20px;
 }
 
 .section-card {
@@ -244,6 +169,7 @@ onMounted(async () => {
   border-radius: var(--card-radius);
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   overflow: hidden;
+  margin-bottom: 16px;
 }
 
 .section-header {
@@ -254,11 +180,7 @@ onMounted(async () => {
   border-bottom: 1px solid var(--border-light);
 }
 
-.section-header h3 {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
+.section-header h3 { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 
 .section-more {
   background: none;
@@ -269,50 +191,56 @@ onMounted(async () => {
   font-weight: 500;
   transition: opacity 0.2s;
 }
+.section-more:hover { opacity: 0.7; }
 
-.section-more:hover {
-  opacity: 0.7;
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
 }
 
-.section-body {
-  padding: 4px 0;
-}
-
-.account-row {
+.account-card {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
   transition: background 0.15s;
   cursor: pointer;
 }
 
-.account-row:hover {
-  background: #f8f9fc;
-}
+.account-card:hover { background: var(--bg); }
 
-.account-info {
+.acct-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #fff;
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.account-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.account-name {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.account-balance {
+  justify-content: center;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary);
-  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.acct-detail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.acct-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.acct-balance { font-size: 15px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+.record-group + .record-group { border-top: 1px solid var(--border-light); }
+.record-date {
+  padding: 8px 20px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .record-row {
@@ -323,16 +251,9 @@ onMounted(async () => {
   transition: background 0.15s;
   cursor: pointer;
 }
+.record-row:hover { background: var(--bg); }
 
-.record-row:hover {
-  background: #f8f9fc;
-}
-
-.record-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+.record-left { display: flex; align-items: center; gap: 12px; }
 
 .record-type-badge {
   width: 36px;
@@ -343,51 +264,63 @@ onMounted(async () => {
   justify-content: center;
   flex-shrink: 0;
 }
+.record-type-badge.expense { background: var(--expense-bg); color: var(--expense); }
+.record-type-badge.income { background: var(--income-bg); color: var(--income); }
 
-.record-type-badge.expense {
-  background: #fef2f2;
-  color: var(--expense);
-}
+.record-meta { display: flex; flex-direction: column; gap: 2px; }
+.record-category { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.record-sub { font-size: 12px; color: var(--text-secondary); }
 
-.record-type-badge.income {
-  background: #ecfdf5;
-  color: var(--income);
-}
+.record-amount { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+.record-amount.expense { color: var(--expense); }
+.record-amount.income { color: var(--income); }
 
-.record-meta {
+.category-rank { padding: 8px 20px 16px; }
+.rank-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.rank-index {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+background: var(--border-light);
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.record-category {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.record-time {
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.record-amount {
   font-weight: 600;
-  font-size: 15px;
-}
-
-.record-amount.expense {
-  color: var(--expense);
-}
-
-.record-amount.income {
-  color: var(--income);
-}
-
-.empty-state {
-  text-align: center;
   color: var(--text-secondary);
-  padding: 32px;
-  font-size: 14px;
+  flex-shrink: 0;
+}
+.rank-name { font-size: 14px; font-weight: 500; color: var(--text-primary); width: 72px; flex-shrink: 0; }
+.rank-bar-wrap { flex: 1; height: 6px; border-radius: 3px; background: var(--border-light); overflow: hidden; }
+.rank-bar { height: 100%; border-radius: 3px; background: linear-gradient(135deg, var(--accent), var(--accent-light)); min-width: 4px; }
+.rank-amount { font-size: 13px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; width: 90px; text-align: right; flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  .stat-grid { grid-template-columns: 1fr; }
+  .account-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+}
+
+.fab {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-purple));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px var(--accent-glow);
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--accent-glow);
 }
 </style>

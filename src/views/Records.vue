@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getRecords } from '@/api/record'
+import { getRecords, deleteRecord } from '@/api/record'
 import { getCategories } from '@/api/category'
 import CategoryIcon from '@/components/CategoryIcon.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import { formatDate, formatMoney } from '@/utils/format'
 import type { RecordItem, Category } from '@/types'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const records = ref<RecordItem[]>([])
@@ -26,15 +29,6 @@ const filters = ref({
   startDate: '' as string,
   endDate: '' as string,
 })
-
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr)
-  return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function formatMoney(val: number) {
-  return '¥' + val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-}
 
 async function fetchRecords() {
   loading.value = true
@@ -60,10 +54,33 @@ function goNew() {
   router.push('/records/new')
 }
 
+function goEdit(record: RecordItem) {
+  router.push({ path: `/records/${record.recordId}/edit`, state: { record } })
+}
+
+async function handleDelete(id: number) {
+  try {
+    await ElMessageBox.confirm('确定删除这条记录吗？', '删除确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    await deleteRecord(id)
+    ElMessage.success('删除成功')
+    fetchRecords()
+  } catch {
+    // cancelled or error
+  }
+}
+
 onMounted(async () => {
-  const catRes = await getCategories()
-  categories.value = catRes.data.data
-  fetchRecords()
+  try {
+    const catRes = await getCategories()
+    categories.value = catRes.data.data
+    fetchRecords()
+  } catch {
+    // 401 handled by interceptor redirect
+  }
 })
 </script>
 
@@ -106,18 +123,12 @@ onMounted(async () => {
     </div>
 
     <div class="records-list" v-loading="loading">
-      <div v-if="records.length === 0" class="empty-state">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-        </svg>
-        <p>暂无记录</p>
-        <button class="btn-primary" @click="goNew">记第一笔</button>
-      </div>
+<EmptyState v-if="records.length === 0 && !loading" text="还没有记录" action-text="记第一笔" @action="goNew" />
       <div v-for="record in records" :key="record.recordId" class="record-card">
-        <div class="record-icon" :class="record.type">
+        <div class="record-icon" :class="record.type" @click="goEdit(record)">
           <CategoryIcon :icon="categoryIconMap[record.categoryId] || 'help'" :size="22" />
         </div>
-        <div class="record-body">
+        <div class="record-body" @click="goEdit(record)">
           <div class="record-top">
             <span class="record-category">{{ record.categoryName }}</span>
             <span :class="['record-amount', record.type]">
@@ -129,6 +140,9 @@ onMounted(async () => {
             <span v-if="record.remark" class="record-remark">{{ record.remark }}</span>
           </div>
         </div>
+        <button class="delete-btn" @click.stop="handleDelete(record.recordId)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M3 6h18M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2m3 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6h14z"/></svg>
+        </button>
       </div>
     </div>
 
@@ -153,18 +167,12 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.records-page {
-  max-width: 680px;
-  margin: 0 auto;
-}
-
 .filter-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .filter-group {
@@ -175,11 +183,11 @@ onMounted(async () => {
 .filter-chip {
   padding: 6px 14px;
   border-radius: 100px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   background: #fff;
   font-size: 13px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
   font-family: inherit;
@@ -189,24 +197,24 @@ onMounted(async () => {
 }
 
 .filter-chip:hover {
-  border-color: #cbd5e1;
-  color: #334155;
+  border-color: var(--text-hint);
+  color: var(--text-dark);
 }
 
 .filter-chip.active {
-  background: #0d0e1a;
-  border-color: #0d0e1a;
+  background: var(--sidebar-bg);
+  border-color: var(--sidebar-bg);
   color: #fff;
 }
 
 .filter-chip.chip-expense.active {
-  background: #ef4444;
-  border-color: #ef4444;
+  background: var(--expense);
+  border-color: var(--expense);
 }
 
 .filter-chip.chip-income.active {
-  background: #10b981;
-  border-color: #10b981;
+  background: var(--income);
+  border-color: var(--income);
 }
 
 .chip-dot {
@@ -215,8 +223,8 @@ onMounted(async () => {
   border-radius: 50%;
 }
 
-.chip-dot.expense { background: #ef4444; }
-.chip-dot.income { background: #10b981; }
+.chip-dot.expense { background: var(--expense); }
+.chip-dot.income { background: var(--income); }
 
 .filter-actions {
   display: flex;
@@ -228,11 +236,11 @@ onMounted(async () => {
 .filter-date {
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   background: #fff;
   font-size: 13px;
   font-family: inherit;
-  color: #334155;
+  color: var(--text-dark);
   outline: none;
   transition: border-color 0.2s;
 }
@@ -246,7 +254,7 @@ onMounted(async () => {
   padding: 8px 18px;
   border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
+  background: linear-gradient(135deg, var(--accent), var(--accent-purple));
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -295,13 +303,13 @@ onMounted(async () => {
 }
 
 .record-icon.expense {
-  background: #fef2f2;
-  color: #ef4444;
+  background: var(--expense-bg);
+  color: var(--expense);
 }
 
 .record-icon.income {
-  background: #ecfdf5;
-  color: #10b981;
+  background: var(--income-bg);
+  color: var(--income);
 }
 
 .record-body {
@@ -328,8 +336,8 @@ onMounted(async () => {
   letter-spacing: -0.3px;
 }
 
-.record-amount.expense { color: #ef4444; }
-.record-amount.income { color: #10b981; }
+.record-amount.expense { color: var(--expense); }
+.record-amount.income { color: var(--income); }
 
 .record-bottom {
   display: flex;
@@ -351,20 +359,29 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
+.delete-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  opacity: 0;
 }
 
-.empty-state svg {
-  opacity: 0.3;
-  margin-bottom: 12px;
+.record-card:hover .delete-btn {
+  opacity: 1;
 }
 
-.empty-state p {
-  margin-bottom: 16px;
-  font-size: 15px;
+.delete-btn:hover {
+  background: var(--expense-bg);
+  color: var(--expense);
 }
 
 .pagination {
@@ -378,11 +395,11 @@ onMounted(async () => {
 .page-btn {
   padding: 8px 16px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   background: #fff;
   font-size: 13px;
   font-weight: 500;
-  color: #334155;
+  color: var(--text-dark);
   cursor: pointer;
   font-family: inherit;
   transition: all 0.2s;
@@ -401,5 +418,15 @@ onMounted(async () => {
 .page-info {
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-actions { flex-wrap: wrap; }
+  .filter-select, .filter-date { font-size: 12px; padding: 6px 10px; }
+  .record-card { padding: 12px 14px; }
+  .record-icon { width: 38px; height: 38px; border-radius: 10px; }
+  .record-amount { font-size: 14px; }
+  .record-meta { font-size: 11px; }
 }
 </style>

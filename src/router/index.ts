@@ -19,11 +19,18 @@ const router = createRouter({
         { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue') },
         { path: 'records', name: 'Records', component: () => import('@/views/Records.vue') },
         { path: 'records/new', name: 'NewRecord', component: () => import('@/views/RecordForm.vue') },
+        { path: 'records/:id/edit', name: 'EditRecord', component: () => import('@/views/RecordForm.vue'), props: true },
         { path: 'statistics', name: 'Statistics', component: () => import('@/views/Statistics.vue') },
         { path: 'accounts', name: 'Accounts', component: () => import('@/views/Accounts.vue') },
         { path: 'categories', name: 'Categories', component: () => import('@/views/Categories.vue') },
         { path: 'profile', name: 'Profile', component: () => import('@/views/Profile.vue') },
       ],
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('@/views/NotFound.vue'),
+      meta: { requiresAuth: false },
     },
   ],
 })

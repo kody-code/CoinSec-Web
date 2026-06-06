@@ -3,7 +3,6 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { login as loginApi, setup as setupApi } from '@/api/auth'
-import { getUserInfo } from '@/api/user'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -18,11 +17,13 @@ const form = ref({
 })
 
 onMounted(async () => {
+  const token = localStorage.getItem('satoken')
+  if (!token) return
   try {
-    await getUserInfo()
+    await auth.fetchUser()
     router.push('/dashboard')
   } catch {
-    // not initialized or not logged in
+    // token invalid, stay on login
   }
 })
 
@@ -146,7 +147,7 @@ async function handleSubmit() {
   justify-content: center;
   position: relative;
   overflow: hidden;
-  background: #0d0e1a;
+  background: var(--sidebar-bg);
 }
 
 .login-bg {
@@ -174,7 +175,7 @@ async function handleSubmit() {
 .orb-2 {
   width: 400px;
   height: 400px;
-  background: #a855f7;
+  background: var(--accent-purple);
   bottom: -15%;
   right: -10%;
   animation-delay: -7s;
@@ -183,7 +184,7 @@ async function handleSubmit() {
 .orb-3 {
   width: 300px;
   height: 300px;
-  background: #10b981;
+  background: var(--income);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -209,7 +210,7 @@ async function handleSubmit() {
 .brand-icon {
   width: 56px;
   height: 56px;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
+  background: linear-gradient(135deg, var(--accent), var(--accent-purple));
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -318,7 +319,7 @@ async function handleSubmit() {
   height: 44px;
   border: none;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
+  background: linear-gradient(135deg, var(--accent), var(--accent-purple));
   color: #fff;
   font-size: 15px;
   font-weight: 600;

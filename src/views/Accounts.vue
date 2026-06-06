@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getAccounts, createAccount, updateAccount, deleteAccount } from '@/api/account'
+import CategoryIcon from '@/components/CategoryIcon.vue'
+import { formatMoney } from '@/utils/format'
+import { accountGradients, colors } from '@/utils/colors'
+import EmptyState from '@/components/EmptyState.vue'
 import type { Account } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -11,15 +15,15 @@ const editing = ref<Account | null>(null)
 
 const form = ref({ name: '', icon: '', balance: 0 })
 
-const gradients = ['linear-gradient(135deg, #6366f1, #818cf8)', 'linear-gradient(135deg, #10b981, #34d399)', 'linear-gradient(135deg, #f59e0b, #fbbf24)', 'linear-gradient(135deg, #ef4444, #f87171)']
-
-function formatMoney(val: number) {
-  return '¥' + val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-}
+const gradients = accountGradients
 
 async function fetchAccounts() {
-  const res = await getAccounts()
-  accounts.value = res.data.data
+  try {
+    const res = await getAccounts()
+    accounts.value = res.data.data
+  } catch {
+    // 401 handled by interceptor redirect
+  }
 }
 
 function openCreate() {
@@ -68,11 +72,12 @@ onMounted(fetchAccounts)
     </div>
 
     <div class="acct-grid">
+      <EmptyState v-if="accounts.length === 0" text="还没有账户" icon="account" />
       <div v-for="acct in accounts" :key="acct.accountId" class="acct-card">
         <div class="acct-top" :style="{ background: gradients[acct.accountId % 4] }">
-          <span class="acct-icon">
-            {{ ['💳', '📱', '💰', '🏦'][acct.accountId % 4] }}
-          </span>
+          <div class="acct-avatar-icon">
+            <CategoryIcon :icon="acct.icon || 'wallet'" :size="26" />
+          </div>
           <span class="acct-name">{{ acct.name }}</span>
         </div>
         <div class="acct-bottom">
@@ -111,11 +116,6 @@ onMounted(fetchAccounts)
 </template>
 
 <style scoped>
-.accounts-page {
-  max-width: 600px;
-  margin: 0 auto;
-}
-
 .page-head {
   margin-bottom: 20px;
 }
@@ -128,7 +128,7 @@ onMounted(fetchAccounts)
 
 .acct-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
 }
 
@@ -154,8 +154,15 @@ onMounted(fetchAccounts)
   gap: 8px;
 }
 
-.acct-icon {
-  font-size: 28px;
+.acct-avatar-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
 }
 
 .acct-name {
@@ -189,14 +196,13 @@ onMounted(fetchAccounts)
   font-weight: 500;
   cursor: pointer;
   font-family: inherit;
-  background: #f1f5f9;
-  color: #64748b;
-  transition: all 0.2s;
+background: var(--border-light);
+  color: var(--text-secondary);
 }
 
-.action-btn:hover { background: #e2e8f0; }
-.action-btn.danger { color: #ef4444; }
-.action-btn.danger:hover { background: #fef2f2; }
+.action-btn:hover { background: var(--border); }
+.action-btn.danger { color: var(--expense); }
+.action-btn.danger:hover { background: var(--expense-bg); }
 
 .add-card {
   display: flex;
@@ -205,7 +211,7 @@ onMounted(fetchAccounts)
   justify-content: center;
   gap: 8px;
   padding: 40px 20px;
-  border: 2px dashed #e2e8f0;
+  border: 2px dashed var(--border);
   background: transparent;
   box-shadow: none;
   cursor: pointer;
@@ -217,11 +223,15 @@ onMounted(fetchAccounts)
 .add-card:hover {
   border-color: var(--accent);
   color: var(--accent);
-  background: #eef2ff;
+  background: var(--accent-bg);
 }
 
 .add-icon {
   opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  .account-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
 }
 
 

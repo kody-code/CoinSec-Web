@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Expand, Fold } from '@element-plus/icons-vue'
-import { ref, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const collapsed = ref(false)
+const mobileOpen = ref(false)
+const sidebarWidth = computed(() => {
+  if (window.innerWidth <= 768) return '0px'
+  return collapsed.value ? '68px' : '240px'
+})
+
+function closeMobileSidebar() {
+  mobileOpen.value = false
+}
 
 const menuItems = [
   { path: '/dashboard', icon: 'Odometer', label: '首页' },
@@ -18,15 +26,17 @@ const menuItems = [
   { path: '/profile', icon: 'User', label: '个人' },
 ]
 
-const activeIcon = computed(() => {
-  const item = menuItems.find(m => route.path.startsWith(m.path))
-  return item?.icon || 'Odometer'
-})
-
-function handleLogout() {
-  auth.clearToken()
+async function handleLogout() {
+  await auth.logout()
   router.push('/login')
 }
+
+onMounted(() => {
+  const token = localStorage.getItem('satoken')
+  if (token && !auth.user) {
+    auth.fetchUser()
+  }
+})
 
 function getIconSvg(name: string) {
   const icons: Record<string, string> = {
@@ -43,66 +53,82 @@ function getIconSvg(name: string) {
 
 <template>
   <div class="app-shell">
-    <aside :class="['sidebar', { collapsed }]">
+    <div v-if="mobileOpen" class="sidebar-overlay" @click="closeMobileSidebar" />
+    <aside :class="['sidebar', { collapsed, 'mobile-open': mobileOpen }]">
       <div class="sidebar-brand">
         <div class="brand-icon">C</div>
-        <span v-show="!collapsed" class="brand-text">CoinSec</span>
+        <transition name="fade">
+          <span v-show="!collapsed" class="brand-text">CoinSec</span>
+        </transition>
       </div>
 
       <nav class="sidebar-nav">
-        <div
+        <router-link
           v-for="item in menuItems"
           :key="item.path"
+          :to="item.path"
           :class="['nav-item', { active: route.path.startsWith(item.path) }]"
-          @click="router.push(item.path)"
+          @click="closeMobileSidebar"
         >
           <div class="nav-icon">
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
               <path :d="getIconSvg(item.icon)" />
             </svg>
           </div>
-          <span v-show="!collapsed" class="nav-label">{{ item.label }}</span>
-          <div v-show="!collapsed && route.path.startsWith(item.path)" class="nav-indicator" />
-        </div>
+          <transition name="fade">
+            <span v-show="!collapsed" class="nav-label">{{ item.label }}</span>
+          </transition>
+          <div v-if="!collapsed && route.path.startsWith(item.path)" class="nav-indicator" />
+        </router-link>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="nav-item" @click="handleLogout">
+        <div class="nav-item logout-item" @click="handleLogout">
           <div class="nav-icon">
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
               <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
             </svg>
           </div>
-          <span v-show="!collapsed" class="nav-label">退出</span>
+          <transition name="fade">
+            <span v-show="!collapsed" class="nav-label">退出</span>
+          </transition>
         </div>
       </div>
-
-      <button class="collapse-btn" @click="collapsed = !collapsed">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-          <path :d="collapsed ? 'M8 5v14l11-7z' : 'M16 5v14l-11-7z'" />
-        </svg>
-      </button>
     </aside>
+
+    <button class="collapse-toggle" @click="collapsed = !collapsed">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+        <path :d="collapsed ? 'M8 5v14l11-7z' : 'M16 5v14l-11-7z'" />
+      </svg>
+    </button>
 
     <main class="main-area">
       <header class="topbar">
         <div class="topbar-left">
+          <button class="hamburger-btn" @click="mobileOpen = true">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+          </button>
           <h2 class="page-title">{{ menuItems.find(m => route.path.startsWith(m.path))?.label || '首页' }}</h2>
         </div>
         <div class="topbar-right">
-          <div class="user-badge">
-            <div class="user-avatar-small">{{ auth.user?.nickname?.charAt(0) || 'U' }}</div>
-            <span class="user-name-small">{{ auth.user?.nickname || '用户' }}</span>
+          <div class="user-badge" @click="router.push('/profile')">
+            <div class="user-avatar-small">{{ auth.user?.nickname?.charAt(0) || auth.user?.username?.charAt(0) || 'U' }}</div>
+            <div class="user-text">
+              <span class="user-name-small">{{ auth.user?.nickname || auth.user?.username || '用户' }}</span>
+              <span v-if="auth.user?.username" class="user-sub-name">@{{ auth.user.username }}</span>
+            </div>
           </div>
         </div>
       </header>
 
       <div class="content-area">
-        <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
+        <div class="content-wrapper">
+          <router-view v-slot="{ Component }">
+            <transition name="page" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </div>
       </div>
     </main>
   </div>
@@ -112,7 +138,7 @@ function getIconSvg(name: string) {
 .app-shell {
   display: flex;
   height: 100vh;
-  background: #f8f9fc;
+  background: var(--bg);
 }
 
 .sidebar {
@@ -120,10 +146,14 @@ function getIconSvg(name: string) {
   background: var(--sidebar-bg);
   display: flex;
   flex-direction: column;
-  position: relative;
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
   flex-shrink: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 0;
 }
 
 .sidebar.collapsed {
@@ -137,12 +167,13 @@ function getIconSvg(name: string) {
   padding: 0 18px;
   gap: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
 }
 
 .brand-icon {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
+  background: linear-gradient(135deg, var(--accent), var(--accent-purple));
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -151,6 +182,7 @@ function getIconSvg(name: string) {
   font-size: 14px;
   color: #fff;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
 .brand-text {
@@ -159,6 +191,7 @@ function getIconSvg(name: string) {
   font-weight: 600;
   letter-spacing: -0.3px;
   white-space: nowrap;
+  overflow: hidden;
 }
 
 .sidebar-nav {
@@ -180,6 +213,7 @@ function getIconSvg(name: string) {
   transition: all 0.2s ease;
   position: relative;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .nav-item:hover {
@@ -204,44 +238,54 @@ function getIconSvg(name: string) {
 .nav-label {
   font-size: 14px;
   font-weight: 500;
+  overflow: hidden;
 }
 
 .nav-indicator {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--accent-light);
   position: absolute;
-  right: 12px;
+  right: 14px;
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .sidebar-footer {
   padding: 8px 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
 }
 
-.collapse-btn {
-  position: absolute;
-  bottom: 16px;
-  right: -12px;
-  width: 24px;
-  height: 24px;
+.logout-item:hover {
+  color: var(--expense-light);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.collapse-toggle {
+  position: fixed;
+  bottom: 28px;
+  z-index: 20;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: var(--sidebar-bg);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.5);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text-hint);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
-  z-index: 10;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  left: v-bind(sidebarWidth);
+  margin-left: -13px;
 }
 
-.collapse-btn:hover {
-  color: #fff;
+.collapse-toggle:hover {
+  color: var(--accent);
   border-color: var(--accent);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .main-area {
@@ -258,6 +302,7 @@ function getIconSvg(name: string) {
   justify-content: space-between;
   padding: 0 32px;
   background: transparent;
+  flex-shrink: 0;
 }
 
 .page-title {
@@ -271,23 +316,24 @@ function getIconSvg(name: string) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px 6px 6px;
+  padding: 6px 14px 6px 6px;
   border-radius: 100px;
   background: var(--card-bg);
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   cursor: pointer;
-  transition: box-shadow 0.2s;
+  transition: all 0.2s;
 }
 
 .user-badge:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  transform: translateY(-1px);
 }
 
 .user-avatar-small {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
+  background: linear-gradient(135deg, var(--accent), var(--accent-purple));
   color: #fff;
   display: flex;
   align-items: center;
@@ -300,12 +346,41 @@ function getIconSvg(name: string) {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.user-sub-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .content-area {
   flex: 1;
-  padding: 0 32px 32px;
   overflow-y: auto;
+}
+
+.content-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 32px 32px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .page-enter-active,
@@ -321,5 +396,76 @@ function getIconSvg(name: string) {
 .page-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+.hamburger-btn {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+  }
+
+  .collapse-toggle {
+    display: none;
+  }
+
+  .hamburger-btn {
+    display: flex;
+  }
+
+  .main-area {
+    width: 100%;
+  }
+
+  .topbar {
+    padding: 0 16px;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .content-wrapper {
+    padding: 0 16px 24px;
+  }
+
+  .user-sub-name {
+    display: none;
+  }
 }
 </style>
