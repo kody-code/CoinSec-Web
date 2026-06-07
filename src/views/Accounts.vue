@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { getAccounts, createAccount, updateAccount, deleteAccount } from '@/api/account'
-import CategoryIcon from '@/components/CategoryIcon.vue'
+import AccountIcon from '@/components/AccountIcon.vue'
 import { formatMoney } from '@/utils/format'
 import { accountGradients, colors } from '@/utils/colors'
 import EmptyState from '@/components/EmptyState.vue'
 import type { Account } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+const router = useRouter()
 
 const accounts = ref<Account[]>([])
 const loading = ref(false)
@@ -14,6 +17,16 @@ const showForm = ref(false)
 const editing = ref<Account | null>(null)
 
 const form = ref({ name: '', icon: '', balance: 0 })
+
+const availableIcons: Record<string, string> = {
+  wechat: '微信',
+  alipay: '支付宝',
+  payments: '现金',
+  credit_card: '银行卡',
+  gongshang: '工商',
+  zhaoshang: '招商',
+  zhongguo: '中国银行',
+}
 
 const gradients = accountGradients
 
@@ -24,6 +37,10 @@ async function fetchAccounts() {
   } catch {
     // 401 handled by interceptor redirect
   }
+}
+
+function goDetail(id: number) {
+  router.push(`/accounts/${id}`)
 }
 
 function openCreate() {
@@ -43,7 +60,7 @@ async function handleSave() {
   loading.value = true
   try {
     if (editing.value) {
-      await updateAccount(editing.value.accountId, { name: form.value.name })
+      await updateAccount(editing.value.accountId, { name: form.value.name, icon: form.value.icon || undefined })
     } else {
       await createAccount({ name: form.value.name, icon: form.value.icon || undefined, balance: form.value.balance || undefined })
     }
@@ -55,7 +72,11 @@ async function handleSave() {
 
 async function handleDelete(id: number) {
   try {
-    await ElMessageBox.confirm('确定删除？')
+    await ElMessageBox.confirm(
+      '删除账户后，该账户下的所有账单记录和转账记录将被一并删除，且无法恢复。确定删除？',
+      '删除账户',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
     await deleteAccount(id)
     ElMessage.success('已删除')
     fetchAccounts()
@@ -73,18 +94,18 @@ onMounted(fetchAccounts)
 
     <div class="acct-grid">
       <EmptyState v-if="accounts.length === 0" text="还没有账户" icon="account" />
-      <div v-for="acct in accounts" :key="acct.accountId" class="acct-card">
+      <div v-for="acct in accounts" :key="acct.accountId" class="acct-card" @click="goDetail(acct.accountId)">
         <div class="acct-top" :style="{ background: gradients[acct.accountId % 4] }">
           <div class="acct-avatar-icon">
-            <CategoryIcon :icon="acct.icon || 'wallet'" :size="26" />
+            <AccountIcon :icon="acct.icon || 'wallet'" :size="26" />
           </div>
           <span class="acct-name">{{ acct.name }}</span>
         </div>
         <div class="acct-bottom">
           <div class="acct-balance">{{ formatMoney(acct.balance) }}</div>
           <div class="acct-actions">
-            <button class="action-btn" @click="openEdit(acct)">编辑</button>
-            <button class="action-btn danger" @click="handleDelete(acct.accountId)">删除</button>
+            <button class="action-btn" @click.stop="openEdit(acct)">编辑</button>
+            <button class="action-btn danger" @click.stop="handleDelete(acct.accountId)">删除</button>
           </div>
         </div>
       </div>
@@ -105,6 +126,20 @@ onMounted(fetchAccounts)
         </el-form-item>
         <el-form-item v-if="!editing" label="余额">
           <el-input-number v-model="form.balance" :precision="2" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="图标">
+          <div class="icon-grid">
+            <button
+              v-for="(label, icon) in availableIcons"
+              :key="icon"
+              type="button"
+              :class="['icon-option', { active: form.icon === icon }]"
+              @click.stop="form.icon = icon"
+            >
+              <AccountIcon :icon="icon" :size="28" />
+              <span class="icon-label">{{ label }}</span>
+            </button>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -228,6 +263,60 @@ background: var(--border-light);
 
 .add-icon {
   opacity: 0.5;
+}
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.icon-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.icon-option:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.icon-option.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.icon-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.icon-none {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--border-light);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 @media (max-width: 768px) {

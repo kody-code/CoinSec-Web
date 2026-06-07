@@ -2,6 +2,9 @@
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { updateNickname, updatePassword } from '@/api/user'
+import { getAccounts } from '@/api/account'
+import { formatMoney } from '@/utils/format'
+import type { Account } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const auth = useAuthStore()
@@ -9,6 +12,25 @@ const nickVal = ref('')
 const pwForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const nickLoading = ref(false)
 const pwLoading = ref(false)
+
+const accounts = ref<Account[]>([])
+const defaultExpenseId = ref(0)
+const defaultIncomeId = ref(0)
+
+function loadDefaults() {
+  defaultExpenseId.value = Number(localStorage.getItem('defaultExpenseAccountId')) || 0
+  defaultIncomeId.value = Number(localStorage.getItem('defaultIncomeAccountId')) || 0
+}
+
+function saveDefault(type: 'expense' | 'income') {
+  const key = type === 'expense' ? 'defaultExpenseAccountId' : 'defaultIncomeAccountId'
+  const val = type === 'expense' ? defaultExpenseId.value : defaultIncomeId.value
+  if (val > 0) {
+    localStorage.setItem(key, String(val))
+  } else {
+    localStorage.removeItem(key)
+  }
+}
 
 async function saveNickname() {
   if (!nickVal.value) { ElMessage.warning('请输入昵称'); return }
@@ -31,7 +53,14 @@ async function savePassword() {
   } finally { pwLoading.value = false }
 }
 
-onMounted(() => { if (auth.user) nickVal.value = auth.user.nickname || '' })
+onMounted(async () => {
+  if (auth.user) nickVal.value = auth.user.nickname || ''
+  loadDefaults()
+  try {
+    const res = await getAccounts()
+    accounts.value = res.data.data
+  } catch { /* 401 */ }
+})
 </script>
 
 <template>
@@ -79,6 +108,34 @@ onMounted(() => { if (auth.user) nickVal.value = auth.user.nickname || '' })
         <button class="save-btn" :disabled="pwLoading" @click="savePassword">
           {{ pwLoading ? '修改中...' : '修改密码' }}
         </button>
+      </div>
+    </div>
+
+    <div class="profile-card">
+      <div class="card-icon-row">
+        <div class="card-icon-wrap preference">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </div>
+        <div class="card-content">
+          <span class="card-label">默认账户</span>
+          <span class="card-value">记账时自动选中的账户</span>
+        </div>
+      </div>
+      <div class="pref-row">
+        <div class="pref-field">
+          <label class="pref-label">默认支出账户</label>
+          <el-select v-model="defaultExpenseId" @change="saveDefault('expense')" placeholder="不设置" style="width: 100%">
+            <el-option :value="0" label="不设置" />
+            <el-option v-for="acct in accounts" :key="acct.accountId" :value="acct.accountId" :label="`${acct.name} (${formatMoney(acct.balance)})`" />
+          </el-select>
+        </div>
+        <div class="pref-field">
+          <label class="pref-label">默认收入账户</label>
+          <el-select v-model="defaultIncomeId" @change="saveDefault('income')" placeholder="不设置" style="width: 100%">
+            <el-option :value="0" label="不设置" />
+            <el-option v-for="acct in accounts" :key="acct.accountId" :value="acct.accountId" :label="`${acct.name} (${formatMoney(acct.balance)})`" />
+          </el-select>
+        </div>
       </div>
     </div>
 
@@ -193,6 +250,11 @@ onMounted(() => { if (auth.user) nickVal.value = auth.user.nickname || '' })
   color: var(--expense);
 }
 
+.card-icon-wrap.preference {
+  background: var(--income-bg);
+  color: var(--income);
+}
+
 .card-content {
   display: flex;
   flex-direction: column;
@@ -265,6 +327,23 @@ onMounted(() => { if (auth.user) nickVal.value = auth.user.nickname || '' })
 
 .info-card {
   margin-top: 4px;
+}
+
+.pref-row {
+  display: flex;
+  gap: 12px;
+}
+
+.pref-field {
+  flex: 1;
+}
+
+.pref-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
 }
 
 .info-row {

@@ -21,3 +21,16 @@ export function createTransfer(data: {
 }) {
   return request.post<ApiResult<{ transferId: number }>>('/transfers', data)
 }
+
+export function deleteTransfer(id: number) {
+  return request.delete<ApiResult<null>>(`/transfers/${id}`)
+}
+
+export function deleteTransferByRecord(params: {
+  accountId: number
+  amount: number
+  recordTime: string
+  type: string
+}) {
+  return request.delete<ApiResult<null>>('/transfers/by-record', { params })
+}

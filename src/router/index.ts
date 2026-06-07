@@ -22,6 +22,7 @@ const router = createRouter({
         { path: 'records/:id/edit', name: 'EditRecord', component: () => import('@/views/RecordForm.vue'), props: true },
         { path: 'statistics', name: 'Statistics', component: () => import('@/views/Statistics.vue') },
         { path: 'accounts', name: 'Accounts', component: () => import('@/views/Accounts.vue') },
+        { path: 'accounts/:id', name: 'AccountDetail', component: () => import('@/views/AccountDetail.vue') },
         { path: 'categories', name: 'Categories', component: () => import('@/views/Categories.vue') },
         { path: 'profile', name: 'Profile', component: () => import('@/views/Profile.vue') },
       ],

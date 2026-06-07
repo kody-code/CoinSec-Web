@@ -4,10 +4,11 @@ import type { ApiResult, RecordItem, Statistics, PageResult } from '@/types'
 export interface RecordQuery {
   page?: number
   size?: number
-  categoryId?: number
   type?: string
+  categoryIds?: string
   startDate?: string
   endDate?: string
+  accountId?: number
 }
 
 export function getRecords(params: RecordQuery) {
@@ -40,8 +41,8 @@ export function deleteRecord(id: number) {
   return request.delete<ApiResult<void>>(`/records/${id}`)
 }
 
-export function getStatistics(startDate: string, endDate: string) {
+export function getStatistics(startDate: string, endDate: string, accountId?: number) {
   return request.get<ApiResult<Statistics>>('/records/statistics', {
-    params: { startDate, endDate },
+    params: { startDate, endDate, accountId },
   })
 }

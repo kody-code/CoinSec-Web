@@ -66,7 +66,14 @@ async function handleSubmit() {
 
     <div class="login-container">
       <div class="login-brand">
-        <div class="brand-icon">C</div>
+        <div class="brand-icon">
+          <svg viewBox="0 0 48 48" width="32" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M24 4L8 14v12c0 11 7.5 21.5 16 26 8.5-4.5 16-15 16-26V14L24 4z" fill="#fff" opacity="0.15"/>
+            <path d="M24 6L10 15v11c0 10 6.8 19.5 14 23.5 7.2-4 14-13.5 14-23.5V15L24 6z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="24" cy="26" r="10" stroke="#fff" stroke-width="1.5" fill="none"/>
+            <path d="M30 20c-1.5-1.2-3.5-2-5.5-2C19 18 15.5 21.5 15.5 26s3.5 8 9 8c2 0 4-.8 5.5-2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
         <h1 class="brand-title">CoinSec</h1>
         <p class="brand-subtitle">智慧管理每一笔</p>
       </div>

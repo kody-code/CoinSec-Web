@@ -6,6 +6,7 @@ import { getCategories } from '@/api/category'
 import { getAccounts } from '@/api/account'
 import CategoryIcon from '@/components/CategoryIcon.vue'
 import { accountColorList } from '@/utils/colors'
+import { formatMoney } from '@/utils/format'
 import type { Category, Account, RecordItem } from '@/types'
 import { ElMessage } from 'element-plus'
 import ClockPicker from '@/components/ClockPicker.vue'
@@ -19,7 +20,6 @@ const existingRecord = ref<RecordItem | null>(null)
 const categories = ref<Category[]>([])
 const accounts = ref<Account[]>([])
 const loading = ref(false)
-const categorySearch = ref('')
 
 function getDefaultDate() {
   const now = new Date()
@@ -32,6 +32,11 @@ function getDefaultTime() {
 }
 
 const typeFilter = ref('expense')
+
+function getDefaultAccountId(type: string): number {
+  const key = type === 'expense' ? 'defaultExpenseAccountId' : 'defaultIncomeAccountId'
+  return Number(localStorage.getItem(key)) || 0
+}
 
 const form = ref({
   type: 'expense' as string,
@@ -48,22 +53,15 @@ const showTimePicker = ref(false)
 
 const filteredCategories = ref<Category[]>([])
 
-function filterCategories() {
-  const byType = categories.value.filter(c => c.type === typeFilter.value)
-  if (!categorySearch.value) {
-    filteredCategories.value = byType
-  } else {
-    const q = categorySearch.value.toLowerCase()
-    filteredCategories.value = byType.filter(c => c.name.toLowerCase().includes(q))
-  }
-}
-
 function selectType(type: string) {
   form.value.type = type
   form.value.categoryId = undefined
   typeFilter.value = type
-  categorySearch.value = ''
-  filterCategories()
+  filteredCategories.value = categories.value.filter(c => c.type === type)
+  const defaultId = getDefaultAccountId(type)
+  if (defaultId && accounts.value.some(a => a.accountId === defaultId)) {
+    form.value.accountId = defaultId
+  }
 }
 
 async function handleSubmit() {
@@ -101,7 +99,14 @@ onMounted(async () => {
     const [catRes, acctRes] = await Promise.all([getCategories(), getAccounts()])
     categories.value = catRes.data.data
     accounts.value = acctRes.data.data
-    filterCategories()
+    filteredCategories.value = categories.value.filter(c => c.type === 'expense')
+
+    if (!isEdit.value) {
+      const defaultId = getDefaultAccountId('expense')
+      if (defaultId && accounts.value.some(a => a.accountId === defaultId)) {
+        form.value.accountId = defaultId
+      }
+    }
 
     if (isEdit.value) {
       const record = window.history.state.record as RecordItem | undefined
@@ -168,7 +173,6 @@ onMounted(async () => {
 
     <div class="form-card">
       <div class="form-label">分类</div>
-      <input v-model="categorySearch" placeholder="搜索分类..." class="category-search" @input="filterCategories" />
       <div class="category-grid">
         <button
           v-for="cat in filteredCategories"
@@ -192,7 +196,12 @@ onMounted(async () => {
           @click="form.accountId = acct.accountId"
         >
           <div class="account-dot" :style="{ background: accountColorList[acct.accountId % 4] }" />
-          <span>{{ acct.name }}</span>
+          <div class="account-info">
+            <span class="account-name">{{ acct.name }}</span>
+            <span class="account-balance">{{ formatMoney(acct.balance) }}</span>
+          </div>
+          <span v-if="getDefaultAccountId('expense') === acct.accountId" class="default-badge expense">支出</span>
+          <span v-if="getDefaultAccountId('income') === acct.accountId" class="default-badge income">收入</span>
         </button>
       </div>
     </div>
@@ -359,26 +368,6 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 
-.category-search {
-  width: 100%;
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 0.2s;
-  background: var(--bg);
-  margin-bottom: 10px;
-  color: var(--text-primary);
-}
-
-.category-search:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-  background: #fff;
-}
-
 .category-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -447,6 +436,43 @@ onMounted(async () => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.account-balance {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.default-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.default-badge.expense {
+  background: var(--expense-bg);
+  color: var(--expense);
+}
+
+.default-badge.income {
+  background: var(--income-bg);
+  color: var(--income);
 }
 
 .form-input {

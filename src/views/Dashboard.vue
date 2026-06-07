@@ -4,11 +4,10 @@ import { useRouter } from 'vue-router'
 import { getAccounts } from '@/api/account'
 import { getRecords, getStatistics } from '@/api/record'
 import { formatMoney, formatDate, formatDateGroup } from '@/utils/format'
-import { accountColorList } from '@/utils/colors'
 import StatCard from '@/components/StatCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
-import CategoryIcon from '@/components/CategoryIcon.vue'
+import AccountIcon from '@/components/AccountIcon.vue'
 import type { Account, RecordItem, Statistics } from '@/types'
 
 const router = useRouter()
@@ -77,9 +76,10 @@ onMounted(async () => {
             v-for="acct in accounts"
             :key="acct.accountId"
             class="account-card"
+            @click="router.push('/accounts/' + acct.accountId)"
           >
-            <div class="acct-avatar" :style="{ background: accountColorList[acct.accountId % 4] }">
-              <CategoryIcon :icon="acct.icon || 'wallet'" :size="22" />
+            <div class="acct-avatar">
+              <AccountIcon :icon="acct.icon || 'wallet'" :size="22" />
             </div>
             <div class="acct-detail">
               <span class="acct-name">{{ acct.name }}</span>

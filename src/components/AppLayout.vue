@@ -43,6 +43,7 @@ function getIconSvg(name: string) {
     Odometer: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-13h-2v6l5.25 3.15L17 12.23l-4-2.37V7z',
     Notebook: 'M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12zM10 9h8v2h-8V9zm0 3h4v2h-4v-2zm0-6h8v2h-8V6z',
     DataAnalysis: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7v-7zm4-3h2v10h-2V7zm4 6h2v4h-2v-4z',
+    Swap: 'M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z',
     Wallet: 'M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
     Collection: 'M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z',
     User: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z',
@@ -56,7 +57,14 @@ function getIconSvg(name: string) {
     <div v-if="mobileOpen" class="sidebar-overlay" @click="closeMobileSidebar" />
     <aside :class="['sidebar', { collapsed, 'mobile-open': mobileOpen }]">
       <div class="sidebar-brand">
-        <div class="brand-icon">C</div>
+        <div class="brand-icon">
+          <svg viewBox="0 0 48 48" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M24 4L8 14v12c0 11 7.5 21.5 16 26 8.5-4.5 16-15 16-26V14L24 4z" fill="#fff" opacity="0.15"/>
+            <path d="M24 6L10 15v11c0 10 6.8 19.5 14 23.5 7.2-4 14-13.5 14-23.5V15L24 6z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="24" cy="26" r="10" stroke="#fff" stroke-width="1.5" fill="none"/>
+            <path d="M30 20c-1.5-1.2-3.5-2-5.5-2C19 18 15.5 21.5 15.5 26s3.5 8 9 8c2 0 4-.8 5.5-2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
         <transition name="fade">
           <span v-show="!collapsed" class="brand-text">CoinSec</span>
         </transition>

@@ -2,16 +2,20 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRecords, deleteRecord } from '@/api/record'
+import { getAccounts } from '@/api/account'
 import { getCategories } from '@/api/category'
+import { createTransfer, deleteTransferByRecord } from '@/api/transfer'
 import CategoryIcon from '@/components/CategoryIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { formatDate, formatMoney } from '@/utils/format'
-import type { RecordItem, Category } from '@/types'
+import { accountGradients as gradients } from '@/utils/colors'
+import type { RecordItem, Category, Account } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const records = ref<RecordItem[]>([])
 const categories = ref<Category[]>([])
+const accounts = ref<Account[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
@@ -23,26 +27,57 @@ const categoryIconMap = computed(() => {
   return map
 })
 
+const transferCategoryIds = computed(() => {
+  return categories.value
+    .filter(c => c.name === '转账')
+    .map(c => c.categoryId)
+})
+
 const filters = ref({
   type: '' as string,
-  categoryId: undefined as number | undefined,
   startDate: '' as string,
   endDate: '' as string,
+})
+
+const showTransferForm = ref(false)
+const transferSubmitting = ref(false)
+const transferForm = ref({
+  fromAccountId: undefined as number | undefined,
+  toAccountId: undefined as number | undefined,
+  amount: 0,
+  remark: '',
 })
 
 async function fetchRecords() {
   loading.value = true
   try {
-    const res = await getRecords({
+    const params: Record<string, any> = {
       page: page.value,
       size: pageSize.value,
-      ...filters.value,
-    })
+    }
+    if (filters.value.type === 'transfer') {
+      if (transferCategoryIds.value.length > 0) {
+        params.categoryIds = transferCategoryIds.value.join(',')
+      }
+    } else {
+      if (filters.value.type) params.type = filters.value.type
+    }
+    if (filters.value.startDate) params.startDate = filters.value.startDate
+    if (filters.value.endDate) params.endDate = filters.value.endDate
+
+    const res = await getRecords(params)
     records.value = res.data.data.content
     total.value = res.data.data.totalElements
   } finally {
     loading.value = false
   }
+}
+
+async function fetchAccounts() {
+  try {
+    const res = await getAccounts()
+    accounts.value = res.data.data
+  } catch { /* 401 handled by interceptor */ }
 }
 
 function handleSearch() {
@@ -54,18 +89,67 @@ function goNew() {
   router.push('/records/new')
 }
 
+function openTransferForm() {
+  transferForm.value = {
+    fromAccountId: undefined,
+    toAccountId: undefined,
+    amount: 0,
+    remark: '',
+  }
+  showTransferForm.value = true
+}
+
+async function handleTransferSubmit() {
+  if (!transferForm.value.fromAccountId) { ElMessage.warning('请选择转出账户'); return }
+  if (!transferForm.value.toAccountId) { ElMessage.warning('请选择转入账户'); return }
+  if (transferForm.value.fromAccountId === transferForm.value.toAccountId) { ElMessage.warning('转出和转入账户不能相同'); return }
+  if (!transferForm.value.amount || transferForm.value.amount <= 0) { ElMessage.warning('请输入有效金额'); return }
+
+  transferSubmitting.value = true
+  try {
+    await createTransfer({
+      fromAccountId: transferForm.value.fromAccountId,
+      toAccountId: transferForm.value.toAccountId,
+      amount: transferForm.value.amount,
+      remark: transferForm.value.remark || undefined,
+    })
+    ElMessage.success('转账成功')
+    showTransferForm.value = false
+    fetchRecords()
+    fetchAccounts()
+  } catch {
+    // error shown by interceptor
+  } finally {
+    transferSubmitting.value = false
+  }
+}
+
 function goEdit(record: RecordItem) {
+  if (record.categoryName === '转账') return
   router.push({ path: `/records/${record.recordId}/edit`, state: { record } })
 }
 
-async function handleDelete(id: number) {
+async function handleDelete(record: RecordItem) {
+  const isTransfer = record.categoryName === '转账'
   try {
-    await ElMessageBox.confirm('确定删除这条记录吗？', '删除确认', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-    await deleteRecord(id)
+    await ElMessageBox.confirm(
+      isTransfer
+        ? '确定删除这条转账记录吗？关联的转入/转出记录将被一并删除，余额将回退。'
+        : '确定删除这条记录吗？',
+      '删除确认',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+
+    if (isTransfer) {
+      await deleteTransferByRecord({
+        accountId: record.accountId,
+        amount: record.amount,
+        recordTime: record.recordTime.replace(' ', 'T'),
+        type: record.type,
+      })
+    } else {
+      await deleteRecord(record.recordId)
+    }
     ElMessage.success('删除成功')
     fetchRecords()
   } catch {
@@ -73,10 +157,19 @@ async function handleDelete(id: number) {
   }
 }
 
+function handleAddCommand(command: string) {
+  if (command === 'record') goNew()
+  else if (command === 'transfer') openTransferForm()
+}
+
 onMounted(async () => {
   try {
-    const catRes = await getCategories()
+    const [catRes, acctRes] = await Promise.all([
+      getCategories(),
+      getAccounts(),
+    ])
     categories.value = catRes.data.data
+    accounts.value = acctRes.data.data
     fetchRecords()
   } catch {
     // 401 handled by interceptor redirect
@@ -108,29 +201,42 @@ onMounted(async () => {
           <span class="chip-dot income" />
           收入
         </button>
+        <button
+          :class="['filter-chip', 'chip-transfer', { active: filters.type === 'transfer' }]"
+          @click="filters.type = 'transfer'; handleSearch()"
+        >
+          <span class="chip-dot transfer" />
+          转账
+        </button>
       </div>
       <div class="filter-actions">
-        <select v-model="filters.categoryId" class="filter-select" @change="handleSearch">
-          <option :value="undefined">全部分类</option>
-          <option v-for="cat in categories" :key="cat.categoryId" :value="cat.categoryId">
-            {{ cat.name }}
-          </option>
-        </select>
         <input v-model="filters.startDate" type="date" class="filter-date" @change="handleSearch" />
         <input v-model="filters.endDate" type="date" class="filter-date" @change="handleSearch" />
-        <button class="btn-primary" @click="goNew">+ 记一笔</button>
+
+        <el-dropdown @command="handleAddCommand">
+          <button class="btn-primary">+ 记一笔</button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="record">记一笔</el-dropdown-item>
+              <el-dropdown-item command="transfer">转账</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
     <div class="records-list" v-loading="loading">
-<EmptyState v-if="records.length === 0 && !loading" text="还没有记录" action-text="记第一笔" @action="goNew" />
+      <EmptyState v-if="records.length === 0 && !loading" text="还没有记录" @action="goNew" />
       <div v-for="record in records" :key="record.recordId" class="record-card">
-        <div class="record-icon" :class="record.type" @click="goEdit(record)">
+        <div class="record-icon" :class="[record.type, { transfer: record.categoryName === '转账' }]" @click="goEdit(record)">
           <CategoryIcon :icon="categoryIconMap[record.categoryId] || 'help'" :size="22" />
         </div>
         <div class="record-body" @click="goEdit(record)">
           <div class="record-top">
-            <span class="record-category">{{ record.categoryName }}</span>
+            <div class="record-left">
+              <span class="record-category">{{ record.categoryName }}</span>
+              <span v-if="record.categoryName === '转账'" class="transfer-badge">转账</span>
+            </div>
             <span :class="['record-amount', record.type]">
               {{ record.type === 'expense' ? '-' : '+' }}{{ formatMoney(record.amount) }}
             </span>
@@ -140,29 +246,42 @@ onMounted(async () => {
             <span v-if="record.remark" class="record-remark">{{ record.remark }}</span>
           </div>
         </div>
-        <button class="delete-btn" @click.stop="handleDelete(record.recordId)">
+        <button class="delete-btn" @click.stop="handleDelete(record)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M3 6h18M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2m3 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6h14z"/></svg>
         </button>
       </div>
     </div>
 
     <div v-if="total > pageSize" class="pagination">
-      <button
-        :disabled="page <= 1"
-        class="page-btn"
-        @click="page--; fetchRecords()"
-      >
-        ← 上一页
-      </button>
+      <button :disabled="page <= 1" class="page-btn" @click="page--; fetchRecords()">← 上一页</button>
       <span class="page-info">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
-      <button
-        :disabled="page >= Math.ceil(total / pageSize)"
-        class="page-btn"
-        @click="page++; fetchRecords()"
-      >
-        下一页 →
-      </button>
+      <button :disabled="page >= Math.ceil(total / pageSize)" class="page-btn" @click="page++; fetchRecords()">下一页 →</button>
     </div>
+
+    <el-dialog v-model="showTransferForm" title="转账" width="420px">
+      <el-form label-width="80px">
+        <el-form-item label="转出账户">
+          <el-select v-model="transferForm.fromAccountId" placeholder="选择转出账户" style="width: 100%">
+            <el-option v-for="acct in accounts" :key="acct.accountId" :label="`${acct.name} (${formatMoney(acct.balance)})`" :value="acct.accountId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="转入账户">
+          <el-select v-model="transferForm.toAccountId" placeholder="选择转入账户" style="width: 100%">
+            <el-option v-for="acct in accounts" :key="acct.accountId" :label="`${acct.name} (${formatMoney(acct.balance)})`" :value="acct.accountId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="金额">
+          <el-input v-model.number="transferForm.amount" type="number" step="0.01" placeholder="请输入金额" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="transferForm.remark" placeholder="可选" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showTransferForm = false">取消</el-button>
+        <el-button type="primary" :loading="transferSubmitting" @click="handleTransferSubmit">确认转账</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -217,6 +336,11 @@ onMounted(async () => {
   border-color: var(--income);
 }
 
+.filter-chip.chip-transfer.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .chip-dot {
   width: 6px;
   height: 6px;
@@ -225,6 +349,7 @@ onMounted(async () => {
 
 .chip-dot.expense { background: var(--expense); }
 .chip-dot.income { background: var(--income); }
+.chip-dot.transfer { background: var(--accent); }
 
 .filter-actions {
   display: flex;
@@ -232,7 +357,6 @@ onMounted(async () => {
   align-items: center;
 }
 
-.filter-select,
 .filter-date {
   padding: 6px 12px;
   border-radius: 8px;
@@ -245,7 +369,6 @@ onMounted(async () => {
   transition: border-color 0.2s;
 }
 
-.filter-select:focus,
 .filter-date:focus {
   border-color: var(--accent);
 }
@@ -312,6 +435,11 @@ onMounted(async () => {
   color: var(--income);
 }
 
+.record-icon.transfer {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
 .record-body {
   flex: 1;
   min-width: 0;
@@ -324,10 +452,25 @@ onMounted(async () => {
   margin-bottom: 4px;
 }
 
+.record-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .record-category {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.transfer-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
 .record-amount {
@@ -423,7 +566,7 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-actions { flex-wrap: wrap; }
-  .filter-select, .filter-date { font-size: 12px; padding: 6px 10px; }
+  .filter-date { font-size: 12px; padding: 6px 10px; }
   .record-card { padding: 12px 14px; }
   .record-icon { width: 38px; height: 38px; border-radius: 10px; }
   .record-amount { font-size: 14px; }
