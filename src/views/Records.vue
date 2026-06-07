@@ -126,7 +126,7 @@ async function handleTransferSubmit() {
 
 function goEdit(record: RecordItem) {
   if (record.categoryName === '转账') return
-  router.push({ path: `/records/${record.recordId}/edit`, state: { record } })
+  router.push({ path: `/records/${record.recordId}/edit`, state: { record: record as any } })
 }
 
 async function handleDelete(record: RecordItem) {

@@ -64,6 +64,10 @@ function selectType(type: string) {
   }
 }
 
+function filterCategories() {
+  filteredCategories.value = categories.value.filter(c => c.type === typeFilter.value)
+}
+
 async function handleSubmit() {
   if (!form.value.categoryId || !form.value.accountId || !form.value.amount) {
     ElMessage.warning('请填写完整信息')
