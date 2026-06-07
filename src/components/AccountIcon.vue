@@ -23,7 +23,7 @@ async function loadIcon() {
   }
 
   try {
-    const res = await fetch(`/icons/${props.icon}.svg`)
+    const res = await fetch(`/api/icons/${props.icon}.svg`)
     if (!res.ok) throw new Error('not found')
     const raw = await res.text()
     const cleaned = raw
