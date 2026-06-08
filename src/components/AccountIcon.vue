@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import { Capacitor } from '@capacitor/core'
+import { getApiBaseUrl } from '@/api/base'
 
 const iconCache = new Map<string, string>()
-const ICON_BASE = Capacitor.isNativePlatform()
-  ? 'https://coinsec.site/api'
-  : (import.meta.env.VITE_API_BASE_URL as string || '/api')
+const ICON_BASE = getApiBaseUrl()
 
 const props = withDefaults(defineProps<{
   icon: string

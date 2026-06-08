@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { ApiResult } from '@/types'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
-import { Capacitor } from '@capacitor/core'
+import { getApiBaseUrl } from './base'
 
 let onUnauthorized: (() => void) | null = null
 
@@ -10,9 +10,7 @@ export function onAuthUnauthorized(callback: () => void) {
   onUnauthorized = callback
 }
 
-const API_BASE = Capacitor.isNativePlatform()
-  ? 'https://coinsec.site/api'
-  : (import.meta.env.VITE_API_BASE_URL as string || '/api')
+export const API_BASE = getApiBaseUrl()
 
 const request = axios.create({
   baseURL: API_BASE,
