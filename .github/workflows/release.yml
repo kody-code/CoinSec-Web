@@ -1,0 +1,53 @@
+name: Release Web
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      deployments: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: CoinSec-Web/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: ./CoinSec-Web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ./CoinSec-Web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Web
+        working-directory: ./CoinSec-Web
+        run: pnpm build
+
+      - name: Package dist
+        run: cd CoinSec-Web && zip -r ../web-dist.zip dist/
+
+      - name: Create Release & Upload
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Web ${{ github.ref_name }}"
+          body: "Web前端自动构建版本 ${{ github.ref_name }}"
+          files: web-dist.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
