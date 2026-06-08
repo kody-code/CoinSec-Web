@@ -233,13 +233,13 @@ onMounted(fetchStats)
               <div
                 class="detail-bar-fill"
                 :class="cat.type"
-                :style="{ width: (cat.total / (cat.type === 'expense' ? stats.totalExpense : stats.totalIncome) * 100) + '%' }"
+                :style="{ width: (cat.total / Math.max(cat.type === 'expense' ? stats.totalExpense : stats.totalIncome, 0.01) * 100) + '%' }"
               />
             </div>
           </div>
           <div class="detail-right">
             <span class="detail-amount">{{ formatMoney(cat.total) }}</span>
-            <span class="detail-percent">{{ (cat.total / (cat.type === 'expense' ? stats.totalExpense : stats.totalIncome) * 100).toFixed(1) }}%</span>
+            <span class="detail-percent">{{ (cat.total / Math.max(cat.type === 'expense' ? stats.totalExpense : stats.totalIncome, 0.01) * 100).toFixed(1) }}%</span>
           </div>
         </div>
       </div>

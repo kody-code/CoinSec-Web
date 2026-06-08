@@ -8,7 +8,6 @@ import { createTransfer, deleteTransferByRecord } from '@/api/transfer'
 import CategoryIcon from '@/components/CategoryIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { formatDate, formatMoney } from '@/utils/format'
-import { accountGradients as gradients } from '@/utils/colors'
 import type { RecordItem, Category, Account } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -126,6 +125,7 @@ async function handleTransferSubmit() {
 
 function goEdit(record: RecordItem) {
   if (record.categoryName === '转账') return
+  sessionStorage.setItem('editingRecord', JSON.stringify(record))
   router.push({ path: `/records/${record.recordId}/edit`, state: { record: record as any } })
 }
 

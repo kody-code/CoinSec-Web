@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
+import { Capacitor } from '@capacitor/core'
+
+const iconCache = new Map<string, string>()
+const ICON_BASE = Capacitor.isNativePlatform()
+  ? 'https://coinsec.site/api'
+  : (import.meta.env.VITE_API_BASE_URL as string || '/api')
 
 const props = withDefaults(defineProps<{
   icon: string
@@ -11,19 +17,17 @@ const props = withDefaults(defineProps<{
 const svgContent = ref('')
 const failed = ref(false)
 
-const cache = new Map<string, string>()
-
 async function loadIcon() {
   if (!props.icon) { failed.value = true; return }
 
-  if (cache.has(props.icon)) {
-    svgContent.value = cache.get(props.icon)!
+  if (iconCache.has(props.icon)) {
+    svgContent.value = iconCache.get(props.icon)!
     failed.value = false
     return
   }
 
   try {
-    const res = await fetch(`/api/icons/${props.icon}.svg`)
+    const res = await fetch(`${ICON_BASE}/icons/${props.icon}.svg`)
     if (!res.ok) throw new Error('not found')
     const raw = await res.text()
     const cleaned = raw
@@ -31,7 +35,7 @@ async function loadIcon() {
       .replace(/<!DOCTYPE[^>]*>/, '')
       .replace(/\s+width="[^"]*"/, '')
       .replace(/\s+height="[^"]*"/, '')
-    cache.set(props.icon, cleaned)
+    iconCache.set(props.icon, cleaned)
     svgContent.value = cleaned
     failed.value = false
   } catch {

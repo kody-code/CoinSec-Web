@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 
 const props = defineProps<{
   modelValue: string
@@ -13,6 +13,9 @@ const emit = defineEmits<{
 
 const mode = ref<'hour' | 'minute'>('hour')
 const dialRef = ref<HTMLElement | null>(null)
+const editing = ref(false)
+const editValue = ref('')
+const editInputRef = ref<HTMLInputElement | null>(null)
 
 const hours = computed(() => props.modelValue ? parseInt(props.modelValue.split(':')[0]) % 24 : 0)
 const minutes = computed(() => props.modelValue ? parseInt(props.modelValue.split(':')[1]) : 0)
@@ -29,6 +32,48 @@ const isPM = computed(() => hours.value >= 12)
 const displayValue = computed(() => {
   return `${String(hours.value).padStart(2, '0')}:${String(minutes.value).padStart(2, '0')}`
 })
+
+function startEditing() {
+  editValue.value = displayValue.value
+  editing.value = true
+  nextTick(() => {
+    editInputRef.value?.focus()
+    editInputRef.value?.select()
+  })
+}
+
+function onEditInput(e: Event) {
+  const input = e.target as HTMLInputElement
+  let val = input.value.replace(/[^0-9]/g, '').slice(0, 4)
+  if (val.length >= 3) {
+    val = val.slice(0, 2) + ':' + val.slice(2)
+  }
+  editValue.value = val
+}
+
+function normTime(raw: string): string | null {
+  const digits = raw.replace(/[^0-9]/g, '')
+  if (digits.length < 3) return null
+  let h = parseInt(digits.slice(0, 2))
+  let m = parseInt(digits.slice(2, 4))
+  if (isNaN(h) || isNaN(m)) return null
+  if (h >= 24) h = 23
+  if (m >= 60) m = 59
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function confirmEdit() {
+  const trimmed = editValue.value.trim()
+  const time = normTime(trimmed)
+  if (time) {
+    emit('update:modelValue', time)
+  }
+  editing.value = false
+}
+
+function cancelEdit() {
+  editing.value = false
+}
 
 function selectHour(h: number) {
   let realH = h
@@ -58,11 +103,15 @@ function confirm() {
 }
 
 function close() {
+  editing.value = false
   emit('update:visible', false)
 }
 
 watch(() => props.visible, (v) => {
-  if (v) mode.value = 'hour'
+  if (v) {
+    mode.value = 'hour'
+    editing.value = false
+  }
 })
 
 const hourNumbers = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -74,8 +123,20 @@ const minuteNumbers = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
     <Transition name="picker">
       <div v-if="visible" class="picker-overlay" @click.self="close">
         <div class="picker-card">
-          <div class="picker-display">
-            <span class="picker-time">{{ displayValue }}</span>
+          <div class="picker-display" @click="startEditing">
+            <input
+              v-if="editing"
+              ref="editInputRef"
+              :value="editValue"
+              class="picker-edit-input"
+              placeholder="HHMM"
+              @input="onEditInput"
+              @keyup.enter="confirmEdit"
+              @blur="confirmEdit"
+              @keyup.escape="cancelEdit"
+            />
+            <span v-else class="picker-time">{{ displayValue }}</span>
+            <span v-if="!editing" class="picker-edit-hint">点击编辑</span>
           </div>
 
           <div class="picker-tab">
@@ -84,26 +145,15 @@ const minuteNumbers = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
           </div>
 
           <div class="dial-container" ref="dialRef">
-            <div v-if="mode === 'hour'" class="dial">
+            <div class="dial">
               <button
-                v-for="(h, i) in hourNumbers"
-                :key="h"
-                :class="['dial-number', { selected: displayHour === h }]"
+                v-for="(n, i) in mode === 'hour' ? hourNumbers : minuteNumbers"
+                :key="n"
+                :class="['dial-number', { selected: mode === 'hour' ? displayHour === n : minutes === n }]"
                 :style="{ transform: `rotate(${i * 30}deg) translateY(-88px) rotate(-${i * 30}deg)` }"
-                @click="selectHour(h)"
+                @click="mode === 'hour' ? selectHour(n) : selectMinute(n)"
               >
-                {{ h }}
-              </button>
-            </div>
-            <div v-else class="dial">
-              <button
-                v-for="(m, i) in minuteNumbers"
-                :key="m"
-                :class="['dial-number', { selected: minutes === m }]"
-                :style="{ transform: `rotate(${i * 30}deg) translateY(-88px) rotate(-${i * 30}deg)` }"
-                @click="selectMinute(m)"
-              >
-                {{ String(m).padStart(2, '0') }}
+                {{ mode === 'hour' ? n : String(n).padStart(2, '0') }}
               </button>
             </div>
             <div class="dial-center"></div>
@@ -148,6 +198,13 @@ const minuteNumbers = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
   padding: 20px;
   text-align: center;
   margin-bottom: 20px;
+  cursor: pointer;
+  position: relative;
+  transition: opacity 0.15s;
+}
+
+.picker-display:hover {
+  opacity: 0.9;
 }
 
 .picker-time {
@@ -156,6 +213,36 @@ const minuteNumbers = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
   color: #fff;
   letter-spacing: 2px;
   font-variant-numeric: tabular-nums;
+}
+
+.picker-edit-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  outline: none;
+  font-family: inherit;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.picker-edit-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.picker-edit-hint {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.5px;
 }
 
 .picker-tab {

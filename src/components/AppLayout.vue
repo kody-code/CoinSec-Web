@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const collapsed = ref(false)
 const mobileOpen = ref(false)
+const windowWidth = ref(window.innerWidth)
+
+function onResize() {
+  windowWidth.value = window.innerWidth
+}
+
 const sidebarWidth = computed(() => {
-  if (window.innerWidth <= 768) return '0px'
+  if (windowWidth.value <= 768) return '0px'
   return collapsed.value ? '68px' : '240px'
 })
 
@@ -32,10 +38,15 @@ async function handleLogout() {
 }
 
 onMounted(() => {
+  window.addEventListener('resize', onResize)
   const token = localStorage.getItem('satoken')
   if (token && !auth.user) {
     auth.fetchUser()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
 })
 
 function getIconSvg(name: string) {

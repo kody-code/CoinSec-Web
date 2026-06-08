@@ -23,15 +23,22 @@ defineProps<{
 
 <style scoped>
 .stat-card {
-  padding: 20px;
+  padding: 16px;
   border-radius: var(--card-radius);
   color: #fff;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   position: relative;
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (min-width: 768px) {
+  .stat-card {
+    padding: 20px;
+    gap: 16px;
+  }
 }
 
 .stat-card:hover {
@@ -55,9 +62,9 @@ defineProps<{
 .stat-card.balance { background: linear-gradient(135deg, var(--accent-dark), var(--accent-light)); }
 
 .stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: rgba(255,255,255,0.2);
   display: flex;
   align-items: center;
@@ -66,7 +73,26 @@ defineProps<{
   backdrop-filter: blur(4px);
 }
 
+.stat-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+
 .stat-content { flex: 1; min-width: 0; }
-.stat-label { font-size: 13px; opacity: 0.85; font-weight: 500; margin-bottom: 4px; }
-.stat-value { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+.stat-label { font-size: 12px; opacity: 0.85; font-weight: 500; margin-bottom: 2px; }
+.stat-value { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+
+@media (min-width: 768px) {
+  .stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+  .stat-icon :deep(svg) {
+    width: 22px;
+    height: 22px;
+  }
+  .stat-label { font-size: 13px; margin-bottom: 4px; }
+  .stat-value { font-size: 24px; }
+}
 </style>

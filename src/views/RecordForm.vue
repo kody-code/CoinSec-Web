@@ -50,10 +50,24 @@ const form = ref({
 
 const showDatePicker = ref(false)
 const showTimePicker = ref(false)
+const showAllAccounts = ref(false)
 
 const filteredCategories = ref<Category[]>([])
 
+const hasDefaultAccount = computed(() => {
+  return getDefaultAccountId(form.value.type) > 0
+})
+
+const displayedAccounts = computed(() => {
+  if (!hasDefaultAccount.value || showAllAccounts.value) {
+    return accounts.value
+  }
+  const defaultId = getDefaultAccountId(form.value.type)
+  return accounts.value.filter(a => a.accountId === defaultId)
+})
+
 function selectType(type: string) {
+  showAllAccounts.value = false
   form.value.type = type
   form.value.categoryId = undefined
   typeFilter.value = type
@@ -69,7 +83,8 @@ function filterCategories() {
 }
 
 async function handleSubmit() {
-  if (!form.value.categoryId || !form.value.accountId || !form.value.amount) {
+  const amount = parseFloat(form.value.amount || '0')
+  if (!form.value.categoryId || !form.value.accountId || isNaN(amount) || amount === 0) {
     ElMessage.warning('请填写完整信息')
     return
   }
@@ -80,13 +95,14 @@ async function handleSubmit() {
       categoryId: form.value.categoryId,
       accountId: form.value.accountId,
       type: form.value.type,
-      amount: parseFloat(form.value.amount),
+      amount,
       remark: form.value.remark,
       recordTime: `${form.value.recordDate} ${form.value.recordTimeStr}:00`,
     }
 
     if (isEdit.value && existingRecord.value) {
       await updateRecord(existingRecord.value.recordId, payload)
+      sessionStorage.removeItem('editingRecord')
       ElMessage.success('修改成功')
     } else {
       await createRecord(payload)
@@ -113,7 +129,8 @@ onMounted(async () => {
     }
 
     if (isEdit.value) {
-      const record = window.history.state.record as RecordItem | undefined
+      const record = (window.history.state?.record as RecordItem | undefined)
+        || JSON.parse(sessionStorage.getItem('editingRecord') || 'null')
       if (record) {
         existingRecord.value = record
         form.value.type = record.type
@@ -194,7 +211,7 @@ onMounted(async () => {
       <div class="form-label">账户</div>
       <div class="account-list">
         <button
-          v-for="acct in accounts"
+          v-for="acct in displayedAccounts"
           :key="acct.accountId"
           :class="['account-item', { active: form.accountId === acct.accountId }]"
           @click="form.accountId = acct.accountId"
@@ -206,6 +223,22 @@ onMounted(async () => {
           </div>
           <span v-if="getDefaultAccountId('expense') === acct.accountId" class="default-badge expense">支出</span>
           <span v-if="getDefaultAccountId('income') === acct.accountId" class="default-badge income">收入</span>
+        </button>
+        <button
+          v-if="hasDefaultAccount && !showAllAccounts && accounts.length > 1"
+          class="account-expand-btn"
+          @click="showAllAccounts = true"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M6 9l6 6 6-6"/></svg>
+          展开全部
+        </button>
+        <button
+          v-if="hasDefaultAccount && showAllAccounts"
+          class="account-expand-btn"
+          @click="showAllAccounts = false"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 15l-6-6-6 6"/></svg>
+          收起
         </button>
       </div>
     </div>
@@ -434,6 +467,31 @@ onMounted(async () => {
   border-color: var(--accent);
   background: var(--accent-bg);
   font-weight: 600;
+}
+
+.account-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  flex: 1;
+  min-width: 0;
+}
+
+.account-expand-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
 }
 
 .account-dot {
