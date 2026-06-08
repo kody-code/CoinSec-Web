@@ -47,7 +47,7 @@ jobs:
         run: pnpm build
 
       - name: Package web-dist
-        run: zip -r web-dist.zip dist/
+        run: zip -r coinsec-web-${{ github.ref_name }}.zip dist/
 
       - name: Sync web assets to Android
         run: pnpm exec cap sync
@@ -77,11 +77,9 @@ jobs:
           GRADLE
 
       - name: Build APK
-        run: cd android && ./gradlew assembleRelease
-        env:
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd android && ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk ../coinsec-app-${{ github.ref_name }}.apk
 
       - name: Create Release & Upload
         uses: softprops/action-gh-release@v2
@@ -89,8 +87,8 @@ jobs:
           name: "${{ github.ref_name }}"
           body: "版本 ${{ github.ref_name }}"
           files: |
-            web-dist.zip
-            android/app/build/outputs/apk/release/app-release.apk
+            coinsec-web-${{ github.ref_name }}.zip
+            coinsec-app-${{ github.ref_name }}.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
