@@ -1,4 +1,4 @@
-name: Release Web
+name: Release Web & APK
 
 on:
   push:
@@ -31,21 +31,69 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build Web
         run: pnpm build
 
-      - name: Package dist
+      - name: Package web-dist
         run: zip -r web-dist.zip dist/
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync web assets
+        run: npx cap sync
+
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Configure release signing
+        run: |
+          cat >> android/app/build.gradle << 'GRADLE'
+
+android {
+    signingConfigs {
+        release {
+            storeFile file('release.keystore')
+            storePassword System.getenv("STORE_PASSWORD")
+            keyAlias System.getenv("KEY_ALIAS")
+            keyPassword System.getenv("KEY_PASSWORD")
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+}
+GRADLE
+
+      - name: Build APK
+        run: cd android && ./gradlew assembleRelease
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Create Release & Upload
         uses: softprops/action-gh-release@v2
         with:
-          name: "Web ${{ github.ref_name }}"
-          body: "Web前端自动构建版本 ${{ github.ref_name }}"
-          files: web-dist.zip
+          name: "${{ github.ref_name }}"
+          body: "版本 ${{ github.ref_name }}"
+          files: |
+            web-dist.zip
+            android/app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
