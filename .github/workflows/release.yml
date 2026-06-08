@@ -57,8 +57,7 @@ jobs:
 
       - name: Configure release signing
         run: |
-          cat >> android/app/build.gradle << 'GRADLE'
-
+          cat > android/app/release-signing.gradle << 'GRADLE'
           android {
               signingConfigs {
                   release {
@@ -75,6 +74,7 @@ jobs:
               }
           }
           GRADLE
+          grep -q "release-signing" android/app/build.gradle || echo "apply from: 'release-signing.gradle'" >> android/app/build.gradle
 
       - name: Build APK
         run: |
