@@ -3,6 +3,7 @@ import vue from "@vitejs/plugin-vue";
 import { resolve } from "path";
 
 export default defineConfig({
+  base: "./",
   plugins: [vue()],
   resolve: {
     alias: {
@@ -14,11 +15,11 @@ export default defineConfig({
     port: 3000,
     proxy: {
       "/api": {
-        target: "http://localhost:8080",
+        target: "https://coinsec.site",
         changeOrigin: true,
       },
       "^/icons/.*": {
-        target: "http://localhost:8080",
+        target: "https://coinsec.site",
         changeOrigin: true,
       },
     },

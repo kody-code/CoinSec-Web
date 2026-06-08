@@ -21,6 +21,7 @@ const stats = ref<Statistics | null>(null)
 const loading = ref(true)
 
 const isNative = isNativeApp()
+const appShowAllAccounts = ref(false)
 
 const totalBalance = computed(() => {
   return accounts.value.reduce((sum, a) => sum + a.balance, 0)
@@ -109,7 +110,7 @@ onMounted(async () => {
           </div>
           <div class="app-account-grid">
             <div
-              v-for="acct in accounts" :key="acct.accountId"
+              v-for="acct in (appShowAllAccounts ? accounts : accounts.slice(0, 2))" :key="acct.accountId"
               class="app-account-card"
               @click="router.push('/accounts/' + acct.accountId)"
             >
@@ -120,6 +121,14 @@ onMounted(async () => {
               <span class="app-acct-balance">{{ formatMoney(acct.balance) }}</span>
             </div>
           </div>
+          <button
+            v-if="accounts.length > 2"
+            class="app-account-expand"
+            @click="appShowAllAccounts = !appShowAllAccounts"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path :d="appShowAllAccounts ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'"/></svg>
+            {{ appShowAllAccounts ? '收起' : `展开全部 (${accounts.length})` }}
+          </button>
         </div>
 
         <div class="app-section">
@@ -134,8 +143,7 @@ onMounted(async () => {
             @click="router.push('/records')"
           >
             <div :class="['app-record-icon', r.type]">
-              <svg v-if="r.type === 'expense'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              <CategoryIcon :icon="categoryIconMap[r.categoryId] || 'help'" :size="16" />
             </div>
             <div class="app-record-body">
               <span class="app-record-category">{{ r.categoryName }}</span>
@@ -150,7 +158,7 @@ onMounted(async () => {
         <div class="app-bottom-safe" />
       </template>
 
-      <button class="fab" @click="router.push('/records/new')">
+      <button class="fab fab-mobile" @click="router.push('/records/new')">
         <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
       </button>
     </template>
@@ -438,6 +446,10 @@ background: var(--border-light);
   box-shadow: 0 8px 24px var(--accent-glow);
 }
 
+.fab-mobile {
+  bottom: 80px;
+}
+
 /* ========== App 端样式 ========== */
 .app-loading {
   padding: 24px 16px;
@@ -648,5 +660,30 @@ background: var(--border-light);
 
 .app-bottom-safe {
   height: 72px;
+}
+
+.app-account-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: calc(100% - 32px);
+  margin: 0 16px 12px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.app-account-expand:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
 }
 </style>

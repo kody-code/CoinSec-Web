@@ -11,11 +11,13 @@ import type { Category, Account, RecordItem } from '@/types'
 import { ElMessage } from 'element-plus'
 import ClockPicker from '@/components/ClockPicker.vue'
 import DatePicker from '@/components/DatePicker.vue'
+import { isNativeApp } from '@/utils/platform'
 
 const router = useRouter()
 const route = useRoute()
 const isEdit = computed(() => !!route.params.id)
 const existingRecord = ref<RecordItem | null>(null)
+const isNative = isNativeApp()
 
 const categories = ref<Category[]>([])
 const accounts = ref<Account[]>([])
@@ -156,12 +158,12 @@ onMounted(async () => {
 <template>
   <div class="form-page">
     <div class="form-header">
-      <button class="back-btn" @click="router.back()">
+      <button v-if="!isNative" class="back-btn" @click="router.back()">
         <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
           <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
         </svg>
       </button>
-      <h2>{{ isEdit ? '编辑记录' : '记一笔' }}</h2>
+      <h2 v-if="!isNative">{{ isEdit ? '编辑记录' : '记一笔' }}</h2>
     </div>
 
     <div class="type-selector">

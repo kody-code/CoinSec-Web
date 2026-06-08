@@ -2,6 +2,7 @@
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { isNativeApp } from '@/utils/platform'
 
 const router = useRouter()
 const route = useRoute()
@@ -9,6 +10,7 @@ const auth = useAuthStore()
 const collapsed = ref(false)
 const mobileOpen = ref(false)
 const windowWidth = ref(window.innerWidth)
+const isNative = isNativeApp()
 
 function onResize() {
   windowWidth.value = window.innerWidth
@@ -31,6 +33,24 @@ const menuItems = [
   { path: '/categories', icon: 'Collection', label: '分类' },
   { path: '/profile', icon: 'User', label: '个人' },
 ]
+
+const tabs = [
+  { path: '/statistics', label: '统计', icon: 'bar_chart' },
+  { path: '/dashboard', label: '首页', icon: 'home' },
+  { path: '/profile', label: '我的', icon: 'person' },
+]
+
+const activeTab = computed(() => {
+  const p = route.path
+  if (p.startsWith('/dashboard') || p.startsWith('/records')) return '/dashboard'
+  if (p.startsWith('/statistics')) return '/statistics'
+  if (p.startsWith('/profile') || p.startsWith('/accounts') || p.startsWith('/categories')) return '/profile'
+  return '/dashboard'
+})
+
+function goTab(path: string) {
+  if (route.path !== path) router.push(path)
+}
 
 async function handleLogout() {
   await auth.logout()
@@ -64,93 +84,121 @@ function getIconSvg(name: string) {
 </script>
 
 <template>
-  <div class="app-shell">
-    <div v-if="mobileOpen" class="sidebar-overlay" @click="closeMobileSidebar" />
-    <aside :class="['sidebar', { collapsed, 'mobile-open': mobileOpen }]">
-      <div class="sidebar-brand">
-        <div class="brand-icon">
-          <svg viewBox="0 0 48 48" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M24 4L8 14v12c0 11 7.5 21.5 16 26 8.5-4.5 16-15 16-26V14L24 4z" fill="#fff" opacity="0.15"/>
-            <path d="M24 6L10 15v11c0 10 6.8 19.5 14 23.5 7.2-4 14-13.5 14-23.5V15L24 6z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
-            <circle cx="24" cy="26" r="10" stroke="#fff" stroke-width="1.5" fill="none"/>
-            <path d="M30 20c-1.5-1.2-3.5-2-5.5-2C19 18 15.5 21.5 15.5 26s3.5 8 9 8c2 0 4-.8 5.5-2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" fill="none"/>
-          </svg>
-        </div>
-        <transition name="fade">
-          <span v-show="!collapsed" class="brand-text">CoinSec</span>
-        </transition>
-      </div>
-
-      <nav class="sidebar-nav">
-        <router-link
-          v-for="item in menuItems"
-          :key="item.path"
-          :to="item.path"
-          :class="['nav-item', { active: route.path.startsWith(item.path) }]"
-          @click="closeMobileSidebar"
-        >
-          <div class="nav-icon">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-              <path :d="getIconSvg(item.icon)" />
+  <!-- ========== Web 端：侧边栏布局 ========== -->
+  <template v-if="!isNative">
+    <div class="app-shell">
+      <div v-if="mobileOpen" class="sidebar-overlay" @click="closeMobileSidebar" />
+      <aside :class="['sidebar', { collapsed, 'mobile-open': mobileOpen }]">
+        <div class="sidebar-brand">
+          <div class="brand-icon">
+            <svg viewBox="0 0 48 48" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M24 4L8 14v12c0 11 7.5 21.5 16 26 8.5-4.5 16-15 16-26V14L24 4z" fill="#fff" opacity="0.15"/>
+              <path d="M24 6L10 15v11c0 10 6.8 19.5 14 23.5 7.2-4 14-13.5 14-23.5V15L24 6z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+              <circle cx="24" cy="26" r="10" stroke="#fff" stroke-width="1.5" fill="none"/>
+              <path d="M30 20c-1.5-1.2-3.5-2-5.5-2C19 18 15.5 21.5 15.5 26s3.5 8 9 8c2 0 4-.8 5.5-2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" fill="none"/>
             </svg>
           </div>
           <transition name="fade">
-            <span v-show="!collapsed" class="nav-label">{{ item.label }}</span>
+            <span v-show="!collapsed" class="brand-text">CoinSec</span>
           </transition>
-          <div v-if="!collapsed && route.path.startsWith(item.path)" class="nav-indicator" />
-        </router-link>
-      </nav>
+        </div>
 
-      <div class="sidebar-footer">
-        <div class="nav-item logout-item" @click="handleLogout">
-          <div class="nav-icon">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-              <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
-            </svg>
+        <nav class="sidebar-nav">
+          <router-link
+            v-for="item in menuItems"
+            :key="item.path"
+            :to="item.path"
+            :class="['nav-item', { active: route.path.startsWith(item.path) }]"
+            @click="closeMobileSidebar"
+          >
+            <div class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                <path :d="getIconSvg(item.icon)" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-show="!collapsed" class="nav-label">{{ item.label }}</span>
+            </transition>
+            <div v-if="!collapsed && route.path.startsWith(item.path)" class="nav-indicator" />
+          </router-link>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="nav-item logout-item" @click="handleLogout">
+            <div class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-show="!collapsed" class="nav-label">退出</span>
+            </transition>
           </div>
-          <transition name="fade">
-            <span v-show="!collapsed" class="nav-label">退出</span>
-          </transition>
         </div>
-      </div>
-    </aside>
+      </aside>
 
-    <button class="collapse-toggle" @click="collapsed = !collapsed">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-        <path :d="collapsed ? 'M8 5v14l11-7z' : 'M16 5v14l-11-7z'" />
-      </svg>
-    </button>
+      <button class="collapse-toggle" @click="collapsed = !collapsed">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path :d="collapsed ? 'M8 5v14l11-7z' : 'M16 5v14l-11-7z'" />
+        </svg>
+      </button>
 
-    <main class="main-area">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button class="hamburger-btn" @click="mobileOpen = true">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
-          </button>
-          <h2 class="page-title">{{ menuItems.find(m => route.path.startsWith(m.path))?.label || '首页' }}</h2>
-        </div>
-        <div class="topbar-right">
-          <div class="user-badge" @click="router.push('/profile')">
-            <div class="user-avatar-small">{{ auth.user?.nickname?.charAt(0) || auth.user?.username?.charAt(0) || 'U' }}</div>
-            <div class="user-text">
-              <span class="user-name-small">{{ auth.user?.nickname || auth.user?.username || '用户' }}</span>
-              <span v-if="auth.user?.username" class="user-sub-name">@{{ auth.user.username }}</span>
+      <main class="main-area">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="hamburger-btn" @click="mobileOpen = true">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+            </button>
+            <h2 class="page-title">{{ menuItems.find(m => route.path.startsWith(m.path))?.label || '首页' }}</h2>
+          </div>
+          <div class="topbar-right">
+            <div class="user-badge" @click="router.push('/profile')">
+              <div class="user-avatar-small">{{ auth.user?.nickname?.charAt(0) || auth.user?.username?.charAt(0) || 'U' }}</div>
+              <div class="user-text">
+                <span class="user-name-small">{{ auth.user?.nickname || auth.user?.username || '用户' }}</span>
+                <span v-if="auth.user?.username" class="user-sub-name">@{{ auth.user.username }}</span>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div class="content-area">
-        <div class="content-wrapper">
-          <router-view v-slot="{ Component }">
-            <transition name="page" mode="out-in">
-              <component :is="Component" />
-            </transition>
-          </router-view>
+        <div class="content-area">
+          <div class="content-wrapper">
+            <router-view v-slot="{ Component }">
+              <transition name="page" mode="out-in">
+                <component :is="Component" />
+              </transition>
+            </router-view>
+          </div>
         </div>
+      </main>
+    </div>
+  </template>
+
+  <!-- ========== App 端：底部 Tab 布局 ========== -->
+  <template v-else>
+    <div class="app-shell-mobile">
+      <div class="mobile-content">
+        <router-view v-slot="{ Component }">
+          <transition name="page" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </div>
-    </main>
-  </div>
+
+      <nav class="bottom-tab-bar">
+        <button
+          v-for="tab in tabs"
+          :key="tab.path"
+          :class="['tab-btn', { active: activeTab === tab.path }]"
+          @click="goTab(tab.path)"
+        >
+          <span class="tab-icon material-symbols-rounded">{{ tab.icon }}</span>
+          <span class="tab-label">{{ tab.label }}</span>
+        </button>
+      </nav>
+    </div>
+  </template>
 </template>
 
 <style scoped>
@@ -486,5 +534,71 @@ function getIconSvg(name: string) {
   .user-sub-name {
     display: none;
   }
+}
+
+/* ========== App 端底部 Tab ========== */
+.app-shell-mobile {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+}
+
+.mobile-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 8px;
+}
+
+.bottom-tab-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  height: 64px;
+  padding: 0 16px 8px;
+  background: var(--card-bg);
+  border-top: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.tab-icon {
+  font-size: 24px;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  color: var(--text-secondary);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  line-height: 1;
+}
+
+.tab-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.tab-btn.active .tab-icon {
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  color: var(--accent);
+  transform: scale(1.25);
+}
+
+.tab-btn.active .tab-label {
+  color: var(--accent);
+  font-weight: 600;
 }
 </style>
