@@ -22,21 +22,19 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          package_json_file: CoinSec-Web/package.json
+          package_json_file: package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: pnpm
-          cache-dependency-path: ./CoinSec-Web/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        working-directory: ./CoinSec-Web
         run: pnpm install --frozen-lockfile
 
       - name: Build Web
-        working-directory: ./CoinSec-Web
         run: pnpm build
 
       - name: Package dist
