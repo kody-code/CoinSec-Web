@@ -3,6 +3,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { isNativeApp } from '@/utils/platform'
+import { getApiBaseUrl } from '@/api/base'
+import { Capacitor } from '@capacitor/core'
 
 const router = useRouter()
 const route = useRoute()
@@ -11,6 +13,20 @@ const collapsed = ref(false)
 const mobileOpen = ref(false)
 const windowWidth = ref(window.innerWidth)
 const isNative = isNativeApp()
+const avatarFailed = ref(false)
+
+function avatarSrc(): string | null {
+  const url = auth.user?.avatar
+  if (!url) return null
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const path = url.startsWith('/') ? url : '/' + url
+  if (!Capacitor.isNativePlatform()) {
+    return path
+  }
+  const apiBase = getApiBaseUrl()
+  const origin = apiBase.replace(/\/api$/, '')
+  return origin + path
+}
 
 function onResize() {
   windowWidth.value = window.innerWidth
@@ -153,7 +169,10 @@ function getIconSvg(name: string) {
           </div>
           <div class="topbar-right">
             <div class="user-badge" @click="router.push('/profile')">
-              <div class="user-avatar-small">{{ auth.user?.nickname?.charAt(0) || auth.user?.username?.charAt(0) || 'U' }}</div>
+              <div class="user-avatar-small">
+                <img v-if="avatarSrc() && !avatarFailed" :src="avatarSrc()!" class="avatar-img-small" @error="avatarFailed = true" />
+                <span v-else>{{ auth.user?.nickname?.charAt(0) || auth.user?.username?.charAt(0) || 'U' }}</span>
+              </div>
               <div class="user-text">
                 <span class="user-name-small">{{ auth.user?.nickname || auth.user?.username || '用户' }}</span>
                 <span v-if="auth.user?.username" class="user-sub-name">@{{ auth.user.username }}</span>
@@ -407,6 +426,15 @@ function getIconSvg(name: string) {
   justify-content: center;
   font-size: 13px;
   font-weight: 600;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar-img-small {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .user-name-small {
