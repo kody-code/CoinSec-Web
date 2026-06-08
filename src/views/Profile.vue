@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { updateNickname, updatePassword } from '@/api/user'
+import { updateNickname, updatePassword, uploadAvatar } from '@/api/user'
 import { getAccounts } from '@/api/account'
 import { formatMoney } from '@/utils/format'
+import { getApiBaseUrl } from '@/api/base'
+import { Capacitor } from '@capacitor/core'
 import type { Account } from '@/types'
 import { ElMessage } from 'element-plus'
 
@@ -13,9 +15,60 @@ const pwForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const nickLoading = ref(false)
 const pwLoading = ref(false)
 
+const uploading = ref(false)
+const avatarFailed = ref(false)
+const avatarInput = ref<HTMLInputElement>()
+
+function avatarSrc(): string | null {
+  const url = auth.user?.avatar
+  if (!url) return null
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const path = url.startsWith('/') ? url : '/' + url
+  if (!Capacitor.isNativePlatform()) {
+    return path
+  }
+  const apiBase = getApiBaseUrl()
+  const origin = apiBase.replace(/\/api$/, '')
+  return origin + path
+}
+
+function onAvatarError() {
+  avatarFailed.value = true
+}
+
 const accounts = ref<Account[]>([])
 const defaultExpenseId = ref(0)
 const defaultIncomeId = ref(0)
+
+function triggerUpload() {
+  avatarInput.value?.click()
+}
+
+async function handleAvatarChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  const maxSize = 5 * 1024 * 1024
+  if (file.size > maxSize) {
+    ElMessage.warning('图片不能超过 5MB')
+    return
+  }
+
+  uploading.value = true
+  avatarFailed.value = false
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    await uploadAvatar(fd)
+    await auth.fetchUser()
+    ElMessage.success('头像已更新')
+  } catch {
+    ElMessage.error('头像上传失败')
+  } finally {
+    uploading.value = false
+    if (avatarInput.value) avatarInput.value.value = ''
+  }
+}
 
 function loadDefaults() {
   defaultExpenseId.value = Number(localStorage.getItem('defaultExpenseAccountId')) || 0
@@ -66,7 +119,20 @@ onMounted(async () => {
 <template>
   <div class="profile-page">
     <div class="profile-hero">
-      <div class="profile-avatar-large">{{ auth.user?.nickname?.charAt(0) || 'U' }}</div>
+      <div class="profile-avatar-large" :class="{ uploading }" @click="triggerUpload">
+        <img v-if="avatarSrc() && !avatarFailed" :src="avatarSrc()!" class="avatar-img" @error="onAvatarError" />
+        <span v-else class="avatar-initial">{{ auth.user?.nickname?.charAt(0) || 'U' }}</span>
+        <div class="avatar-overlay">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+        <div v-if="uploading" class="avatar-loading">
+          <div class="spinner"></div>
+        </div>
+      </div>
+      <input ref="avatarInput" type="file" accept="image/*" style="display:none" @change="handleAvatarChange" />
       <div class="profile-info">
         <h2>{{ auth.user?.nickname || '用户' }}</h2>
         <p class="profile-username">@{{ auth.user?.username }}</p>
@@ -197,6 +263,68 @@ onMounted(async () => {
   border: 2px solid rgba(255,255,255,0.1);
   position: relative;
   z-index: 1;
+  cursor: pointer;
+  overflow: hidden;
+  transition: opacity 0.2s;
+}
+
+.profile-avatar-large:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.profile-avatar-large.uploading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-initial {
+  position: relative;
+  z-index: 1;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 2;
+}
+
+.avatar-loading {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .profile-info h2 {
