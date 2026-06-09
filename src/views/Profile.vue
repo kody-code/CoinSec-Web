@@ -7,7 +7,8 @@ import { formatMoney } from '@/utils/format'
 import { getApiBaseUrl } from '@/api/base'
 import { Capacitor } from '@capacitor/core'
 import type { Account } from '@/types'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { hasPin, setPin, clearPin, getConfiguredTimeout, setConfiguredTimeout, getBiometricEnabled, setBiometricEnabled, isBiometricAvailable, triggerLock } from '@/utils/pin'
 
 const auth = useAuthStore()
 const nickVal = ref('')
@@ -42,6 +43,93 @@ function onAvatarError() {
 const accounts = ref<Account[]>([])
 const defaultExpenseId = ref(0)
 const defaultIncomeId = ref(0)
+
+const pinEnabled = ref(hasPin())
+const pinDialogVisible = ref(false)
+const pinDigits = ref(['', '', '', ''])
+const pinConfirmDigits = ref(['', '', '', ''])
+const pinStep = ref<'set' | 'confirm'>('set')
+const pinInputs = ref<(HTMLInputElement | null)[]>([])
+const pinConfirmInputs = ref<(HTMLInputElement | null)[]>([])
+const pinTimeout = ref(getConfiguredTimeout())
+const bioEnabled = ref(getBiometricEnabled())
+const bioAvailable = ref(false)
+
+onMounted(async () => {
+  bioAvailable.value = await isBiometricAvailable()
+})
+
+function onPinInput(idx: number, digits: string[], nextRefs: (HTMLInputElement | null)[]) {
+  if (digits[idx] && idx < 3) {
+    nextRefs[idx + 1]?.focus()
+  }
+}
+
+function onPinKeydown(e: KeyboardEvent, idx: number, digits: string[], prevRefs: (HTMLInputElement | null)[]) {
+  if (e.key === 'Backspace' && !digits[idx] && idx > 0) {
+    prevRefs[idx - 1]?.focus()
+  }
+}
+
+function resetPinForm() {
+  pinDigits.value = ['', '', '', '']
+  pinConfirmDigits.value = ['', '', '', '']
+  pinStep.value = 'set'
+}
+
+function nextPinStep() {
+  if (pinDigits.value.some(d => !d)) {
+    ElMessage.warning('请输入完整 PIN')
+    return
+  }
+  pinStep.value = 'confirm'
+  nextTick(() => (document.querySelector<HTMLInputElement>('.pin-confirm-box')?.focus()))
+}
+
+async function handleSetPin() {
+  if (pinConfirmDigits.value.some(d => !d)) {
+    ElMessage.warning('请确认 PIN')
+    return
+  }
+  const pin = pinDigits.value.join('')
+  const confirm = pinConfirmDigits.value.join('')
+  if (pin !== confirm) {
+    ElMessage.warning('两次输入不一致')
+    pinConfirmDigits.value = ['', '', '', '']
+    pinStep.value = 'set'
+    return
+  }
+  await setPin(pin)
+  pinEnabled.value = true
+  pinDialogVisible.value = false
+  resetPinForm()
+  ElMessage.success('PIN 已设置')
+}
+
+async function handleRemovePin() {
+  try {
+    await ElMessageBox.confirm('确定关闭应用锁？', '提示')
+    clearPin()
+    pinEnabled.value = false
+    ElMessage.success('PIN 已关闭')
+  } catch { /* cancel */ }
+}
+
+function handleTimeoutChange(val: number) {
+  setConfiguredTimeout(val)
+  ElMessage.success(`闲置超时已设为 ${val} 分钟`)
+}
+
+async function handleBioToggle(val: boolean) {
+  if (val && !bioAvailable.value) {
+    ElMessage.warning('设备不支持生物识别')
+    return
+  }
+  setBiometricEnabled(val)
+  bioEnabled.value = val
+  ElMessage.success(val ? '生物识别已开启' : '生物识别已关闭')
+}
+
 
 function triggerUpload() {
   avatarInput.value?.click()
@@ -196,6 +284,82 @@ onMounted(async () => {
       <template #footer>
         <el-button @click="pwDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="pwLoading" @click="savePassword">确认修改</el-button>
+      </template>
+    </el-dialog>
+
+    <div class="profile-card">
+      <div class="card-icon-row">
+        <div class="card-icon-wrap lock">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="card-content">
+          <span class="card-label">应用锁</span>
+          <span class="card-value">{{ pinEnabled ? '已开启' : '已关闭' }}</span>
+        </div>
+        <div class="card-actions">
+          <button class="card-action-btn" @click="pinDialogVisible = true; resetPinForm()">
+            {{ pinEnabled ? '修改' : '设置' }}
+          </button>
+          <button v-if="pinEnabled" class="card-action-btn" @click="triggerLock">锁定</button>
+          <button v-if="pinEnabled" class="card-action-btn danger" @click="handleRemovePin">关闭</button>
+        </div>
+      </div>
+      <div class="pref-row" style="margin-top:8px">
+        <div class="pref-field">
+          <label class="pref-label">闲置自动锁定</label>
+          <el-select v-model="pinTimeout" @change="handleTimeoutChange" style="width: 100%">
+            <el-option :value="1" label="1 分钟" />
+            <el-option :value="5" label="5 分钟" />
+            <el-option :value="15" label="15 分钟" />
+            <el-option :value="30" label="30 分钟" />
+          </el-select>
+        </div>
+      </div>
+      <div v-if="pinEnabled" class="pref-row" style="margin-top:8px">
+        <div class="pref-field">
+          <label class="pref-label">生物识别解锁</label>
+          <el-switch
+            :model-value="bioEnabled"
+            :disabled="!bioAvailable"
+            @update:model-value="handleBioToggle"
+          />
+        </div>
+      </div>
+    </div>
+
+    <el-dialog v-model="pinDialogVisible" title="设置应用锁 PIN" width="360px" @closed="resetPinForm">
+      <div class="pin-dialog-body">
+        <p class="pin-dialog-label">{{ pinStep === 'set' ? '设置 PIN' : '再次输入确认' }}</p>
+        <div class="pin-box-row">
+          <input
+            v-for="i in 4" :key="'pin-' + i"
+            ref="pinInputs"
+            v-model="pinDigits[i - 1]"
+            type="password"
+            class="pin-digit-box"
+            maxlength="1"
+            :class="{ 'pin-confirm-box': pinStep === 'confirm' }"
+            @input="onPinInput(i - 1, pinDigits, pinInputs)"
+            @keydown="onPinKeydown($event, i - 1, pinDigits, pinInputs)"
+          />
+        </div>
+        <div v-if="pinStep === 'confirm'" class="pin-box-row" style="margin-top:16px">
+          <input
+            v-for="i in 4" :key="'cnf-' + i"
+            ref="pinConfirmInputs"
+            v-model="pinConfirmDigits[i - 1]"
+            type="password"
+            class="pin-digit-box"
+            maxlength="1"
+            @input="onPinInput(i - 1, pinConfirmDigits, pinConfirmInputs)"
+            @keydown="onPinKeydown($event, i - 1, pinConfirmDigits, pinConfirmInputs)"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="pinDialogVisible = false; resetPinForm()">取消</el-button>
+        <el-button v-if="pinStep === 'set'" type="primary" @click="nextPinStep">下一步</el-button>
+        <el-button v-else type="primary" @click="handleSetPin">确认</el-button>
       </template>
     </el-dialog>
 
@@ -430,6 +594,11 @@ onMounted(async () => {
   color: var(--expense);
 }
 
+.card-icon-wrap.lock {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
 .card-icon-wrap.preference {
   background: var(--income-bg);
   color: var(--income);
@@ -453,12 +622,71 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.card-action-btn {
+  background: var(--bg);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.card-action-btn:hover {
+  background: var(--primary-bg);
+}
+.card-action-btn.danger {
+  color: var(--expense);
+}
+.card-action-btn.danger:hover {
+  background: var(--expense-bg);
+}
+
 .profile-card.clickable {
   cursor: pointer;
   transition: background 0.15s;
 }
 .profile-card.clickable:hover {
   background: var(--bg);
+}
+
+.pin-dialog-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+}
+.pin-dialog-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+}
+.pin-box-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.pin-digit-box {
+  width: 48px;
+  height: 54px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  border: 2px solid var(--border-light);
+  border-radius: 12px;
+  outline: none;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+.pin-digit-box:focus {
+  border-color: var(--primary);
 }
 
 .pw-dialog-body {
