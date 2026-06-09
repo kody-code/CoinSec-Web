@@ -353,7 +353,7 @@ onMounted(fetchStats)
         </div>
       </div>
 
-      <div v-if="trendDays.length" class="card trend-card">
+      <div v-if="isNative && trendDays.length" class="card trend-card">
         <h3 class="card-title">近7天趋势</h3>
         <div class="trend-chart-wrap">
           <div class="trend-chart-container">
