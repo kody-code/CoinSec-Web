@@ -6,7 +6,7 @@ import { getRecords, getStatistics } from '@/api/record'
 import AccountIcon from '@/components/AccountIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
-import { formatMoney, formatDate } from '@/utils/format'
+import { formatMoney, formatDate, getLocalDateString } from '@/utils/format'
 import type { Account, RecordItem, Statistics } from '@/types'
 
 const route = useRoute()
@@ -21,7 +21,7 @@ const recordsLoading = ref(false)
 
 const now = new Date()
 const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-const today = now.toISOString().slice(0, 10)
+const today = getLocalDateString(now)
 
 async function loadAccount() {
   try {

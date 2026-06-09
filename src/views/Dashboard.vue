@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { getAccounts } from '@/api/account'
 import { getRecords, getStatistics } from '@/api/record'
 import { getCategories } from '@/api/category'
-import { formatMoney, formatDate, formatDateGroup } from '@/utils/format'
+import { formatMoney, formatDate, formatDateGroup, getLocalDateString } from '@/utils/format'
 import StatCard from '@/components/StatCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -53,7 +53,7 @@ onMounted(async () => {
   try {
     const now = new Date()
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-    const today = now.toISOString().slice(0, 10)
+    const today = getLocalDateString(now)
 
     const [acctRes, recRes, statRes, catRes] = await Promise.all([
       getAccounts(),

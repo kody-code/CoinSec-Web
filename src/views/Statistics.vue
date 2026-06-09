@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { getStatistics } from '@/api/record'
-import { formatMoney } from '@/utils/format'
+import { formatMoney, getLocalDateString } from '@/utils/format'
 import { colors } from '@/utils/colors'
 import StatCard from '@/components/StatCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
@@ -25,7 +25,7 @@ const loading = ref(false)
 
 const today = new Date()
 const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
-const todayStr = today.toISOString().slice(0, 10)
+const todayStr = getLocalDateString(today)
 
 const dateRange = ref([monthStart, todayStr])
 
@@ -33,24 +33,24 @@ const presets = [
   { label: '本月', get: () => {
     const d = new Date()
     const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-    return [s, d.toISOString().slice(0, 10)]
+    return [s, getLocalDateString(d)]
   }},
   { label: '上月', get: () => {
     const d = new Date()
     d.setMonth(d.getMonth() - 1)
     const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-    const e = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10)
+    const e = getLocalDateString(new Date(d.getFullYear(), d.getMonth() + 1, 0))
     return [s, e]
   }},
   { label: '近3月', get: () => {
     const d = new Date()
     d.setMonth(d.getMonth() - 2)
     const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-    return [s, new Date().toISOString().slice(0, 10)]
+    return [s, getLocalDateString()]
   }},
   { label: '今年', get: () => {
     const y = new Date().getFullYear()
-    return [`${y}-01-01`, new Date().toISOString().slice(0, 10)]
+    return [`${y}-01-01`, getLocalDateString()]
   }},
 ]
 

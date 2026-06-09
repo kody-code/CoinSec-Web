@@ -6,7 +6,7 @@ import { getCategories } from '@/api/category'
 import { getAccounts } from '@/api/account'
 import CategoryIcon from '@/components/CategoryIcon.vue'
 import { accountColorList } from '@/utils/colors'
-import { formatMoney } from '@/utils/format'
+import { formatMoney, getLocalDateString } from '@/utils/format'
 import type { Category, Account, RecordItem } from '@/types'
 import { ElMessage } from 'element-plus'
 import ClockPicker from '@/components/ClockPicker.vue'
@@ -24,8 +24,7 @@ const accounts = ref<Account[]>([])
 const loading = ref(false)
 
 function getDefaultDate() {
-  const now = new Date()
-  return now.toISOString().slice(0, 10)
+  return getLocalDateString()
 }
 
 function getDefaultTime() {
@@ -142,7 +141,7 @@ onMounted(async () => {
         form.value.remark = record.remark || ''
         if (record.recordTime) {
           const d = new Date(record.recordTime)
-          form.value.recordDate = d.toISOString().slice(0, 10)
+          form.value.recordDate = getLocalDateString(d)
           form.value.recordTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
         }
         typeFilter.value = record.type
