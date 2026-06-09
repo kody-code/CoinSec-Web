@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { isNativeApp } from '@/utils/platform'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
 import CategoryIcon from '@/components/CategoryIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -7,6 +8,7 @@ import type { Category } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const categories = ref<Category[]>([])
+const isNative = isNativeApp()
 const activeTab = ref('expense')
 const loading = ref(false)
 const showForm = ref(false)
@@ -69,7 +71,7 @@ onMounted(fetch)
 </script>
 
 <template>
-  <div class="cat-page">
+  <div :class="['cat-page', { 'cat-page-native': isNative }]">
     <div class="tab-bar">
       <button :class="['tab-btn', { active: activeTab === 'expense' }]" @click="activeTab = 'expense'; filter()">支出</button>
       <button :class="['tab-btn', { active: activeTab === 'income' }]" @click="activeTab = 'income'; filter()">收入</button>
@@ -104,6 +106,7 @@ onMounted(fetch)
         <el-button type="primary" :loading="loading" @click="save">保存</el-button>
       </template>
     </el-dialog>
+    <div v-if="isNative" class="app-bottom-safe" />
   </div>
 </template>
 
@@ -239,5 +242,8 @@ onMounted(fetch)
   .cat-actions { display: flex !important; }
 }
 
+.cat-page-native {
+  padding: 0 16px;
+}
 
 </style>

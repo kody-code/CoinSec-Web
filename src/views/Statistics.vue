@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { isNativeApp } from '@/utils/platform'
 import { getStatistics } from '@/api/record'
 import { formatMoney, getLocalDateString } from '@/utils/format'
 import { colors } from '@/utils/colors'
@@ -20,6 +21,7 @@ import {
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement)
 
+const isNative = isNativeApp()
 const stats = ref<Statistics | null>(null)
 const dailyStats = ref<{ date: string; income: number; expense: number }[]>([])
 const loading = ref(false)
@@ -233,7 +235,7 @@ onMounted(fetchStats)
 </script>
 
 <template>
-  <div class="stats-page">
+  <div :class="['stats-page', { 'stats-page-native': isNative }]">
     <div class="date-section">
       <div class="presets">
         <button
@@ -337,6 +339,7 @@ onMounted(fetchStats)
     </template>
 
     <EmptyState v-else text="暂无数据" />
+    <div v-if="isNative" class="app-bottom-safe" />
   </div>
 </template>
 
@@ -583,5 +586,9 @@ onMounted(fetchStats)
   .summary-row { grid-template-columns: 1fr; }
   .chart-grid { grid-template-columns: 1fr; }
   .card { padding: 16px; }
+}
+
+.stats-page-native {
+  padding: 0 16px;
 }
 </style>

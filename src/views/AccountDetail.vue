@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { isNativeApp } from '@/utils/platform'
 import { getAccounts } from '@/api/account'
 import { getRecords, getStatistics } from '@/api/record'
 import AccountIcon from '@/components/AccountIcon.vue'
@@ -11,6 +12,7 @@ import type { Account, RecordItem, Statistics } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
+const isNative = isNativeApp()
 const accountId = computed(() => Number(route.params.id))
 
 const account = ref<Account | null>(null)
@@ -55,9 +57,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="detail-page">
+  <div :class="['detail-page', { 'detail-page-native': isNative }]">
     <div class="detail-header">
-      <button class="back-btn" @click="router.push('/accounts')">
+      <button v-if="!isNative" class="back-btn" @click="router.push('/accounts')">
         <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
       </button>
       <div class="header-info" v-if="account">
@@ -104,6 +106,7 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    <div v-if="isNative" class="app-bottom-safe" />
   </div>
 </template>
 
@@ -291,5 +294,9 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.detail-page-native {
+  padding: 0 16px;
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { isNativeApp } from '@/utils/platform'
 import { getAccounts, createAccount, updateAccount, deleteAccount } from '@/api/account'
 import AccountIcon from '@/components/AccountIcon.vue'
 import { formatMoney } from '@/utils/format'
@@ -10,6 +11,7 @@ import type { Account } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
+const isNative = isNativeApp()
 
 const accounts = ref<Account[]>([])
 const loading = ref(false)
@@ -87,12 +89,15 @@ onMounted(fetchAccounts)
 </script>
 
 <template>
-  <div class="accounts-page">
+  <div :class="['accounts-page', { 'accounts-page-native': isNative }]">
+    <div v-if="isNative" class="app-accounts-header">
+      <span class="app-accounts-title">账户</span>
+    </div>
     <div class="page-head">
       <p class="page-subtitle">管理你的资金账户</p>
     </div>
 
-    <div class="acct-grid">
+    <div :class="['acct-grid', { 'acct-grid-native': isNative }]">
       <EmptyState v-if="accounts.length === 0" text="还没有账户" icon="account" />
       <div v-for="acct in accounts" :key="acct.accountId" class="acct-card" @click="goDetail(acct.accountId)">
         <div class="acct-top" :style="{ background: gradients[acct.accountId % 4] }">
@@ -147,6 +152,7 @@ onMounted(fetchAccounts)
         <el-button type="primary" :loading="loading" @click="handleSave">保存</el-button>
       </template>
     </el-dialog>
+    <div v-if="isNative" class="app-bottom-safe" />
   </div>
 </template>
 
@@ -323,5 +329,19 @@ background: var(--border-light);
   .account-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
 }
 
+.accounts-page-native {
+  padding: 0 16px;
+}
+.app-accounts-header {
+  padding: 18px 0 8px;
+}
+.app-accounts-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.acct-grid-native {
+  grid-template-columns: 1fr;
+}
 
 </style>

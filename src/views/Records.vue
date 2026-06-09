@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { isNativeApp } from '@/utils/platform'
 import { getRecords, deleteRecord } from '@/api/record'
 import { getAccounts } from '@/api/account'
 import { getCategories } from '@/api/category'
@@ -12,6 +13,7 @@ import type { RecordItem, Category, Account } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
+const isNative = isNativeApp()
 const records = ref<RecordItem[]>([])
 const categories = ref<Category[]>([])
 const accounts = ref<Account[]>([])
@@ -178,41 +180,63 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="records-page">
+  <!-- ========== 原生 APP ========== -->
+  <div v-if="isNative" class="app-records-page">
+    <div class="app-records-header">
+      <div class="app-filter-chips">
+        <button :class="['app-chip', { active: filters.type === '' }]" @click="filters.type = ''; handleSearch()">全部</button>
+        <button :class="['app-chip', { active: filters.type === 'expense' }]" @click="filters.type = 'expense'; handleSearch()">支出</button>
+        <button :class="['app-chip', { active: filters.type === 'income' }]" @click="filters.type = 'income'; handleSearch()">收入</button>
+        <button :class="['app-chip', { active: filters.type === 'transfer' }]" @click="filters.type = 'transfer'; handleSearch()">转账</button>
+      </div>
+      <div class="app-records-dates">
+        <input v-model="filters.startDate" type="date" class="app-date-input" @change="handleSearch" />
+        <span class="app-date-sep">—</span>
+        <input v-model="filters.endDate" type="date" class="app-date-input" @change="handleSearch" />
+      </div>
+    </div>
+
+    <div class="app-records-list" v-loading="loading">
+      <EmptyState v-if="records.length === 0 && !loading" text="还没有记录" @action="goNew" />
+      <div v-for="record in records" :key="record.recordId" class="app-record-item" @click="goEdit(record)">
+        <div :class="['app-record-dot', record.type]" />
+        <div class="app-record-body">
+          <span class="app-rec-category">{{ record.categoryName }}</span>
+          <span class="app-rec-meta">{{ record.accountName }} · {{ formatDate(record.recordTime) }}</span>
+        </div>
+        <div class="app-rec-right">
+          <span :class="['app-rec-amount', record.type]">{{ record.type === 'expense' ? '-' : '+' }}{{ formatMoney(record.amount) }}</span>
+          <button class="app-rec-delete" @click.stop="handleDelete(record)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 6h18M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2m3 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6h14z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="total > pageSize" class="app-records-pagination">
+      <button :disabled="page <= 1" class="app-page-btn" @click="page--; fetchRecords()">←</button>
+      <span class="app-page-info">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
+      <button :disabled="page >= Math.ceil(total / pageSize)" class="app-page-btn" @click="page++; fetchRecords()">→</button>
+    </div>
+
+    <div class="app-bottom-safe" />
+    <button class="app-fab" @click="goNew">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    </button>
+  </div>
+
+  <!-- ========== Web 端 ========== -->
+  <div v-else class="records-page">
     <div class="filter-bar">
       <div class="filter-group">
-        <button
-          :class="['filter-chip', { active: filters.type === '' }]"
-          @click="filters.type = ''; handleSearch()"
-        >
-          全部
-        </button>
-        <button
-          :class="['filter-chip', 'chip-expense', { active: filters.type === 'expense' }]"
-          @click="filters.type = 'expense'; handleSearch()"
-        >
-          <span class="chip-dot expense" />
-          支出
-        </button>
-        <button
-          :class="['filter-chip', 'chip-income', { active: filters.type === 'income' }]"
-          @click="filters.type = 'income'; handleSearch()"
-        >
-          <span class="chip-dot income" />
-          收入
-        </button>
-        <button
-          :class="['filter-chip', 'chip-transfer', { active: filters.type === 'transfer' }]"
-          @click="filters.type = 'transfer'; handleSearch()"
-        >
-          <span class="chip-dot transfer" />
-          转账
-        </button>
+        <button :class="['filter-chip', { active: filters.type === '' }]" @click="filters.type = ''; handleSearch()">全部</button>
+        <button :class="['filter-chip', 'chip-expense', { active: filters.type === 'expense' }]" @click="filters.type = 'expense'; handleSearch()"><span class="chip-dot expense" />支出</button>
+        <button :class="['filter-chip', 'chip-income', { active: filters.type === 'income' }]" @click="filters.type = 'income'; handleSearch()"><span class="chip-dot income" />收入</button>
+        <button :class="['filter-chip', 'chip-transfer', { active: filters.type === 'transfer' }]" @click="filters.type = 'transfer'; handleSearch()"><span class="chip-dot transfer" />转账</button>
       </div>
       <div class="filter-actions">
         <input v-model="filters.startDate" type="date" class="filter-date" @change="handleSearch" />
         <input v-model="filters.endDate" type="date" class="filter-date" @change="handleSearch" />
-
         <el-dropdown @command="handleAddCommand">
           <button class="btn-primary">+ 记一笔</button>
           <template #dropdown>
@@ -571,5 +595,65 @@ onMounted(async () => {
   .record-icon { width: 38px; height: 38px; border-radius: 10px; }
   .record-amount { font-size: 14px; }
   .record-meta { font-size: 11px; }
+}
+
+/* ====== 原生布局 ====== */
+.app-records-page {
+  padding: 12px 16px 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.app-records-header { margin-bottom: 12px; }
+.app-filter-chips { display: flex; gap: 8px; margin-bottom: 10px; }
+.app-chip {
+  flex: 1; padding: 8px 0; border: none; border-radius: 8px;
+  background: var(--bg); color: var(--text-secondary);
+  font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+}
+.app-chip.active { background: var(--primary); color: #fff; }
+.app-records-dates { display: flex; align-items: center; gap: 6px; }
+.app-date-input {
+  flex: 1; padding: 6px 10px; border: 1px solid var(--border-light);
+  border-radius: 8px; font-size: 13px; outline: none;
+  color: var(--text-primary); background: var(--card-bg);
+}
+.app-date-sep { font-size: 13px; color: var(--text-hint); }
+.app-records-list { flex: 1; }
+.app-record-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 0; border-bottom: 1px solid var(--border-light); cursor: pointer;
+}
+.app-record-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.app-record-dot.expense { background: var(--expense); }
+.app-record-dot.income { background: var(--income); }
+.app-record-dot.transfer { background: var(--warning); }
+.app-record-body { flex: 1; min-width: 0; }
+.app-rec-category { display: block; font-size: 15px; font-weight: 500; color: var(--text-primary); }
+.app-rec-meta { font-size: 12px; color: var(--text-secondary); }
+.app-rec-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.app-rec-amount { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.app-rec-amount.expense { color: var(--expense); }
+.app-rec-amount.income { color: var(--income); }
+.app-rec-delete {
+  background: none; border: none; color: var(--text-hint);
+  cursor: pointer; padding: 4px; border-radius: 4px;
+}
+.app-rec-delete:hover { color: var(--expense); background: var(--expense-bg); }
+.app-records-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 0; }
+.app-page-btn {
+  padding: 6px 16px; border: 1px solid var(--border-light);
+  border-radius: 8px; background: var(--card-bg);
+  color: var(--text-primary); font-size: 14px; cursor: pointer;
+}
+.app-page-btn:disabled { opacity: 0.4; cursor: default; }
+.app-page-info { font-size: 13px; color: var(--text-secondary); }
+.app-fab {
+  position: fixed; right: 20px; bottom: 84px;
+  width: 52px; height: 52px; border: none; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+  cursor: pointer; z-index: 100;
 }
 </style>
