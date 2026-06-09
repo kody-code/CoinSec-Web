@@ -16,3 +16,7 @@ export function updatePassword(data: { oldPassword: string; newPassword: string 
 export function uploadAvatar(file: FormData) {
   return request.post<ApiResult<{ avatarUrl: string }>>('/user/avatar', file)
 }
+
+export function setDefaultAccounts(data: { defaultExpenseAccountId: number | null; defaultIncomeAccountId: number | null }) {
+  return request.put<ApiResult<null>>('/user/default-accounts', data)
+}

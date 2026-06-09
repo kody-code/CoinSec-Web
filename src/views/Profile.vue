@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { updateNickname, updatePassword, uploadAvatar } from '@/api/user'
+import { updateNickname, updatePassword, uploadAvatar, setDefaultAccounts } from '@/api/user'
 import { getAccounts } from '@/api/account'
 import { formatMoney } from '@/utils/format'
 import { getApiBaseUrl } from '@/api/base'
@@ -74,17 +74,21 @@ async function handleAvatarChange(e: Event) {
 }
 
 function loadDefaults() {
-  defaultExpenseId.value = Number(localStorage.getItem('defaultExpenseAccountId')) || 0
-  defaultIncomeId.value = Number(localStorage.getItem('defaultIncomeAccountId')) || 0
+  defaultExpenseId.value = auth.user?.defaultExpenseAccountId || 0
+  defaultIncomeId.value = auth.user?.defaultIncomeAccountId || 0
 }
 
-function saveDefault(type: 'expense' | 'income') {
-  const key = type === 'expense' ? 'defaultExpenseAccountId' : 'defaultIncomeAccountId'
-  const val = type === 'expense' ? defaultExpenseId.value : defaultIncomeId.value
-  if (val > 0) {
-    localStorage.setItem(key, String(val))
-  } else {
-    localStorage.removeItem(key)
+async function saveDefault() {
+  const payload = {
+    defaultExpenseAccountId: defaultExpenseId.value || null,
+    defaultIncomeAccountId: defaultIncomeId.value || null,
+  }
+  try {
+    await setDefaultAccounts(payload)
+    await auth.fetchUser()
+    ElMessage.success('默认账户已更新')
+  } catch {
+    ElMessage.error('保存失败')
   }
 }
 
@@ -208,14 +212,14 @@ onMounted(async () => {
       <div class="pref-row">
         <div class="pref-field">
           <label class="pref-label">默认支出账户</label>
-          <el-select v-model="defaultExpenseId" @change="saveDefault('expense')" placeholder="不设置" style="width: 100%">
+          <el-select v-model="defaultExpenseId" @change="saveDefault()" placeholder="不设置" style="width: 100%">
             <el-option :value="0" label="不设置" />
             <el-option v-for="acct in accounts" :key="acct.accountId" :value="acct.accountId" :label="`${acct.name} (${formatMoney(acct.balance)})`" />
           </el-select>
         </div>
         <div class="pref-field">
           <label class="pref-label">默认收入账户</label>
-          <el-select v-model="defaultIncomeId" @change="saveDefault('income')" placeholder="不设置" style="width: 100%">
+          <el-select v-model="defaultIncomeId" @change="saveDefault()" placeholder="不设置" style="width: 100%">
             <el-option :value="0" label="不设置" />
             <el-option v-for="acct in accounts" :key="acct.accountId" :value="acct.accountId" :label="`${acct.name} (${formatMoney(acct.balance)})`" />
           </el-select>

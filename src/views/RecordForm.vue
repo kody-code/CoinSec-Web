@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { createRecord, updateRecord } from '@/api/record'
 import { getCategories } from '@/api/category'
 import { getAccounts } from '@/api/account'
@@ -35,8 +36,9 @@ function getDefaultTime() {
 const typeFilter = ref('expense')
 
 function getDefaultAccountId(type: string): number {
-  const key = type === 'expense' ? 'defaultExpenseAccountId' : 'defaultIncomeAccountId'
-  return Number(localStorage.getItem(key)) || 0
+  const auth = useAuthStore()
+  if (type === 'expense') return auth.user?.defaultExpenseAccountId || 0
+  return auth.user?.defaultIncomeAccountId || 0
 }
 
 const form = ref({
