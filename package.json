@@ -1,7 +1,7 @@
 {
   "name": "coinsec-web",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "packageManager": "pnpm@11.3.0",
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "@capacitor/android": "^8.4.0",
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.4.0",
+    "@capgo/capacitor-native-biometric": "^8.4.5",
     "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.17.0",
     "chart.js": "^4.5.1",
