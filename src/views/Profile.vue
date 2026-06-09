@@ -14,6 +14,7 @@ const nickVal = ref('')
 const nickEditing = ref(false)
 const nickInput = ref<HTMLInputElement>()
 const pwForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const pwDialogVisible = ref(false)
 const nickLoading = ref(false)
 const pwLoading = ref(false)
 
@@ -116,6 +117,7 @@ async function savePassword() {
   try {
     await updatePassword({ oldPassword: pwForm.value.oldPassword, newPassword: pwForm.value.newPassword })
     ElMessage.success('密码已修改')
+    pwDialogVisible.value = false
     pwForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
   } finally { pwLoading.value = false }
 }
@@ -169,25 +171,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="profile-card">
-      <div class="card-icon-row">
-        <div class="card-icon-wrap nickname">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </div>
-        <div class="card-content">
-          <span class="card-label">昵称</span>
-          <span class="card-value">{{ auth.user?.nickname || '未设置' }}</span>
-        </div>
-      </div>
-      <div class="card-edit-row">
-        <input v-model="nickVal" placeholder="输入新昵称" class="field-input" />
-        <button class="save-btn" :disabled="nickLoading" @click="saveNickname">
-          {{ nickLoading ? '保存中...' : '保存' }}
-        </button>
-      </div>
-    </div>
-
-    <div class="profile-card">
+    <div class="profile-card clickable" @click="pwDialogVisible = true; pwForm = { oldPassword: '', newPassword: '', confirmPassword: '' }">
       <div class="card-icon-row">
         <div class="card-icon-wrap password">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
@@ -197,15 +181,19 @@ onMounted(async () => {
           <span class="card-value">••••••••</span>
         </div>
       </div>
-      <div class="card-edit-row stacked">
+    </div>
+
+    <el-dialog v-model="pwDialogVisible" title="修改密码" width="360px">
+      <div class="pw-dialog-body">
         <input v-model="pwForm.oldPassword" type="password" placeholder="原密码" class="field-input" />
         <input v-model="pwForm.newPassword" type="password" placeholder="新密码" class="field-input" />
         <input v-model="pwForm.confirmPassword" type="password" placeholder="确认新密码" class="field-input" />
-        <button class="save-btn" :disabled="pwLoading" @click="savePassword">
-          {{ pwLoading ? '修改中...' : '修改密码' }}
-        </button>
       </div>
-    </div>
+      <template #footer>
+        <el-button @click="pwDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="pwLoading" @click="savePassword">确认修改</el-button>
+      </template>
+    </el-dialog>
 
     <div class="profile-card">
       <div class="card-icon-row">
@@ -433,11 +421,6 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.card-icon-wrap.nickname {
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-
 .card-icon-wrap.password {
   background: var(--expense-bg);
   color: var(--expense);
@@ -466,13 +449,18 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
-.card-edit-row {
-  display: flex;
-  gap: 10px;
+.profile-card.clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.profile-card.clickable:hover {
+  background: var(--bg);
 }
 
-.card-edit-row.stacked {
+.pw-dialog-body {
+  display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 
 .field-input {
