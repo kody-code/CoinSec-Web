@@ -21,6 +21,7 @@ import {
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement)
 
 const stats = ref<Statistics | null>(null)
+const dailyStats = ref<{ date: string; income: number; expense: number }[]>([])
 const loading = ref(false)
 
 const today = new Date()
@@ -104,6 +105,62 @@ const barData = computed(() => {
   }
 })
 
+const dailyBarData = computed(() => {
+  if (!dailyStats.value.length) return null
+  return {
+    labels: dailyStats.value.map(d => {
+      const p = d.date.split('-')
+      return `${Number(p[1])}/${Number(p[2])}`
+    }),
+    datasets: [
+      {
+        label: '收入',
+        data: dailyStats.value.map(d => d.income),
+        backgroundColor: colors.income,
+        borderRadius: 4,
+      },
+      {
+        label: '支出',
+        data: dailyStats.value.map(d => d.expense),
+        backgroundColor: colors.expense,
+        borderRadius: 4,
+      },
+    ],
+  }
+})
+
+const dailyBarOptions = {
+  plugins: {
+    legend: {
+      display: true,
+      position: 'top' as const,
+      labels: { boxWidth: 12, padding: 12, font: { size: 12 } },
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx: any) => `${ctx.dataset.label}: ${formatMoney(ctx.raw)}`,
+      },
+    },
+  },
+  scales: {
+    x: {
+      stacked: false,
+      grid: { display: false },
+      ticks: { font: { size: 11 } },
+    },
+    y: {
+      stacked: false,
+      grid: { color: '#f1f5f9' },
+      ticks: {
+        font: { size: 11 },
+        callback: (v: any) => formatMoney(v),
+      },
+    },
+  },
+  responsive: true,
+  maintainAspectRatio: false,
+}
+
 const barOptions = {
   indexAxis: 'y' as const,
   plugins: {
@@ -131,11 +188,36 @@ const barOptions = {
   maintainAspectRatio: false,
 }
 
+function getDaysInRange(start: string, end: string): string[] {
+  const days: string[] = []
+  const s = new Date(start)
+  const e = new Date(end)
+  while (s <= e) {
+    days.push(getLocalDateString(s))
+    s.setDate(s.getDate() + 1)
+  }
+  return days
+}
+
+async function fetchDailyStats() {
+  const days = getDaysInRange(dateRange.value[0], dateRange.value[1])
+  if (days.length > 31) { dailyStats.value = []; return }
+  const results = await Promise.all(
+    days.map(d => getStatistics(d, d).then(r => ({
+      date: d,
+      income: r.data.data.totalIncome,
+      expense: r.data.data.totalExpense,
+    })).catch(() => ({ date: d, income: 0, expense: 0 })))
+  )
+  dailyStats.value = results
+}
+
 async function fetchStats() {
   loading.value = true
   try {
     const res = await getStatistics(dateRange.value[0], dateRange.value[1])
     stats.value = res.data.data
+    fetchDailyStats()
   } catch {
     // 401 handled by interceptor redirect
   } finally {
@@ -215,6 +297,15 @@ onMounted(fetchStats)
               <Bar :data="barData" :options="barOptions" />
             </div>
             <EmptyState v-else text="暂无分类数据" icon="category" />
+          </div>
+        </div>
+      </div>
+
+      <div v-if="dailyBarData" class="card">
+        <h3 class="card-title">每日收支对比</h3>
+        <div class="bar-wrapper">
+          <div class="bar-container">
+            <Bar :data="dailyBarData" :options="dailyBarOptions" />
           </div>
         </div>
       </div>
