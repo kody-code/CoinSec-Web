@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { updateNickname, updatePassword, uploadAvatar } from '@/api/user'
 import { getAccounts } from '@/api/account'
@@ -11,6 +11,8 @@ import { ElMessage } from 'element-plus'
 
 const auth = useAuthStore()
 const nickVal = ref('')
+const nickEditing = ref(false)
+const nickInput = ref<HTMLInputElement>()
 const pwForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const nickLoading = ref(false)
 const pwLoading = ref(false)
@@ -85,6 +87,12 @@ function saveDefault(type: 'expense' | 'income') {
   }
 }
 
+function startEditNick() {
+  if (auth.user) nickVal.value = auth.user.nickname || ''
+  nickEditing.value = true
+  nextTick(() => nickInput.value?.focus())
+}
+
 async function saveNickname() {
   if (!nickVal.value) { ElMessage.warning('请输入昵称'); return }
   nickLoading.value = true
@@ -92,7 +100,13 @@ async function saveNickname() {
     await updateNickname({ nickname: nickVal.value })
     await auth.fetchUser()
     ElMessage.success('昵称已更新')
+    nickEditing.value = false
   } finally { nickLoading.value = false }
+}
+
+function cancelEditNick() {
+  nickEditing.value = false
+  if (auth.user) nickVal.value = auth.user.nickname || ''
 }
 
 async function savePassword() {
@@ -134,7 +148,23 @@ onMounted(async () => {
       </div>
       <input ref="avatarInput" type="file" accept="image/*" style="display:none" @change="handleAvatarChange" />
       <div class="profile-info">
-        <h2>{{ auth.user?.nickname || '用户' }}</h2>
+        <div v-if="nickEditing" class="nick-edit-inline">
+          <input
+            ref="nickInput"
+            v-model="nickVal"
+            class="nick-input"
+            maxlength="20"
+            @keyup.enter="saveNickname"
+            @keyup.escape="cancelEditNick"
+            @blur="saveNickname"
+          />
+        </div>
+        <h2 v-else>
+          {{ auth.user?.nickname || '用户' }}
+          <button class="nick-edit-btn" @click="startEditNick">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          </button>
+        </h2>
         <p class="profile-username">@{{ auth.user?.username }}</p>
       </div>
     </div>
@@ -331,8 +361,43 @@ onMounted(async () => {
   font-size: 20px;
   font-weight: 600;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   position: relative;
   z-index: 1;
+}
+
+.nick-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-hint);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.nick-edit-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg);
+}
+
+.nick-edit-inline {
+  width: 100%;
+}
+.nick-input {
+  width: 100%;
+  font-size: 20px;
+  font-weight: 600;
+  border: 2px solid var(--primary);
+  border-radius: 8px;
+  padding: 6px 10px;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  box-sizing: border-box;
 }
 
 .profile-username {
