@@ -28,6 +28,11 @@ const categoryIconMap = computed(() => {
   return map
 })
 
+const filteredCategories = computed(() => {
+  if (filters.value.type === 'transfer') return []
+  return categories.value.filter(c => !filters.value.type || c.type === filters.value.type)
+})
+
 const transferCategoryIds = computed(() => {
   return categories.value
     .filter(c => c.name === '转账')
@@ -36,6 +41,7 @@ const transferCategoryIds = computed(() => {
 
 const filters = ref({
   type: '' as string,
+  categoryId: undefined as number | undefined,
   startDate: '' as string,
   endDate: '' as string,
 })
@@ -63,6 +69,7 @@ async function fetchRecords() {
     } else {
       if (filters.value.type) params.type = filters.value.type
     }
+    if (filters.value.categoryId) params.categoryIds = String(filters.value.categoryId)
     if (filters.value.startDate) params.startDate = filters.value.startDate
     if (filters.value.endDate) params.endDate = filters.value.endDate
 
@@ -79,6 +86,12 @@ async function fetchAccounts() {
     const res = await getAccounts()
     accounts.value = res.data.data
   } catch { /* 401 handled by interceptor */ }
+}
+
+function onTypeChange(type: string) {
+  filters.value.type = type
+  filters.value.categoryId = undefined
+  handleSearch()
 }
 
 function handleSearch() {
@@ -184,15 +197,25 @@ onMounted(async () => {
   <div v-if="isNative" class="app-records-page">
     <div class="app-records-header">
       <div class="app-filter-chips">
-        <button :class="['app-chip', { active: filters.type === '' }]" @click="filters.type = ''; handleSearch()">全部</button>
-        <button :class="['app-chip', { active: filters.type === 'expense' }]" @click="filters.type = 'expense'; handleSearch()">支出</button>
-        <button :class="['app-chip', { active: filters.type === 'income' }]" @click="filters.type = 'income'; handleSearch()">收入</button>
-        <button :class="['app-chip', { active: filters.type === 'transfer' }]" @click="filters.type = 'transfer'; handleSearch()">转账</button>
+        <button :class="['app-chip', { active: filters.type === '' }]" @click="onTypeChange('')">全部</button>
+        <button :class="['app-chip', { active: filters.type === 'expense' }]" @click="onTypeChange('expense')">支出</button>
+        <button :class="['app-chip', { active: filters.type === 'income' }]" @click="onTypeChange('income')">收入</button>
+        <button :class="['app-chip', { active: filters.type === 'transfer' }]" @click="onTypeChange('transfer')">转账</button>
       </div>
       <div class="app-records-dates">
         <input v-model="filters.startDate" type="date" class="app-date-input" @change="handleSearch" />
         <span class="app-date-sep">—</span>
         <input v-model="filters.endDate" type="date" class="app-date-input" @change="handleSearch" />
+      </div>
+      <div v-if="filteredCategories.length" class="app-cat-chips">
+        <button
+          v-for="cat in filteredCategories" :key="cat.categoryId"
+          :class="['app-mini-chip', { active: filters.categoryId === cat.categoryId }]"
+          @click="filters.categoryId = filters.categoryId === cat.categoryId ? undefined : cat.categoryId; handleSearch()"
+        >
+          <span class="material-symbols-rounded" style="font-size:14px">{{ cat.icon }}</span>
+          {{ cat.name }}
+        </button>
       </div>
     </div>
 
@@ -229,10 +252,10 @@ onMounted(async () => {
   <div v-else class="records-page">
     <div class="filter-bar">
       <div class="filter-group">
-        <button :class="['filter-chip', { active: filters.type === '' }]" @click="filters.type = ''; handleSearch()">全部</button>
-        <button :class="['filter-chip', 'chip-expense', { active: filters.type === 'expense' }]" @click="filters.type = 'expense'; handleSearch()"><span class="chip-dot expense" />支出</button>
-        <button :class="['filter-chip', 'chip-income', { active: filters.type === 'income' }]" @click="filters.type = 'income'; handleSearch()"><span class="chip-dot income" />收入</button>
-        <button :class="['filter-chip', 'chip-transfer', { active: filters.type === 'transfer' }]" @click="filters.type = 'transfer'; handleSearch()"><span class="chip-dot transfer" />转账</button>
+        <button :class="['filter-chip', { active: filters.type === '' }]" @click="onTypeChange('')">全部</button>
+        <button :class="['filter-chip', 'chip-expense', { active: filters.type === 'expense' }]" @click="onTypeChange('expense')"><span class="chip-dot expense" />支出</button>
+        <button :class="['filter-chip', 'chip-income', { active: filters.type === 'income' }]" @click="onTypeChange('income')"><span class="chip-dot income" />收入</button>
+        <button :class="['filter-chip', 'chip-transfer', { active: filters.type === 'transfer' }]" @click="onTypeChange('transfer')"><span class="chip-dot transfer" />转账</button>
       </div>
       <div class="filter-actions">
         <input v-model="filters.startDate" type="date" class="filter-date" @change="handleSearch" />
@@ -246,6 +269,16 @@ onMounted(async () => {
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+      </div>
+      <div v-if="filteredCategories.length" class="filter-cat-row">
+        <button
+          v-for="cat in filteredCategories" :key="cat.categoryId"
+          :class="['filter-cat-chip', { active: filters.categoryId === cat.categoryId }]"
+          @click="filters.categoryId = filters.categoryId === cat.categoryId ? undefined : cat.categoryId; handleSearch()"
+        >
+          <CategoryIcon :icon="cat.icon" :size="14" />
+          {{ cat.name }}
+        </button>
       </div>
     </div>
 
@@ -648,6 +681,56 @@ onMounted(async () => {
 }
 .app-page-btn:disabled { opacity: 0.4; cursor: default; }
 .app-page-info { font-size: 13px; color: var(--text-secondary); }
+.app-cat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.app-mini-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 100px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+.app-mini-chip.active {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+.filter-cat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.filter-cat-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 100px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+.filter-cat-chip.active {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
 .app-fab {
   position: fixed; right: 20px; bottom: 84px;
   width: 52px; height: 52px; border: none; border-radius: 50%;
