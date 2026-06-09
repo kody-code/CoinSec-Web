@@ -8,7 +8,7 @@ import StatCard from '@/components/StatCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import type { Statistics } from '@/types'
-import { Doughnut, Bar } from 'vue-chartjs'
+import { Doughnut, Bar, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   ArcElement,
@@ -17,13 +17,17 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  PointElement,
+  LineElement,
+  Filler,
 } from 'chart.js'
 
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement)
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Filler)
 
 const isNative = isNativeApp()
 const stats = ref<Statistics | null>(null)
 const dailyStats = ref<{ date: string; income: number; expense: number }[]>([])
+const trendDays = ref<{ date: string; income: number; expense: number }[]>([])
 const loading = ref(false)
 
 const today = new Date()
@@ -106,6 +110,59 @@ const barData = computed(() => {
     }],
   }
 })
+
+const trendData = computed(() => ({
+  labels: trendDays.value.map(d => {
+    const p = d.date.split('-')
+    return `${Number(p[1])}/${Number(p[2])}`
+  }),
+  datasets: [
+    {
+      label: '收入',
+      data: trendDays.value.map(d => d.income),
+      borderColor: colors.income,
+      backgroundColor: colors.income + '20',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+    },
+    {
+      label: '支出',
+      data: trendDays.value.map(d => d.expense),
+      borderColor: colors.expense,
+      backgroundColor: colors.expense + '20',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+    },
+  ],
+}))
+
+const trendOptions = {
+  plugins: {
+    legend: {
+      display: true,
+      position: 'top' as const,
+      labels: { boxWidth: 12, padding: 12, font: { size: 12 } },
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx: any) => `${ctx.dataset.label}: ${formatMoney(ctx.raw)}`,
+      },
+    },
+  },
+  scales: {
+    x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+    y: {
+      grid: { color: '#f1f5f9' },
+      ticks: { font: { size: 11 }, callback: (v: any) => formatMoney(v) },
+    },
+  },
+  responsive: true,
+  maintainAspectRatio: false,
+}
 
 const dailyBarData = computed(() => {
   if (!dailyStats.value.length) return null
@@ -214,12 +271,31 @@ async function fetchDailyStats() {
   dailyStats.value = results
 }
 
+async function fetchTrend() {
+  const days: { date: string; income: number; expense: number }[] = []
+  const today = new Date()
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dateStr = getLocalDateString(d)
+    try {
+      const res = await getStatistics(dateStr, dateStr)
+      const s = res.data.data
+      days.push({ date: dateStr, income: s.totalIncome, expense: s.totalExpense })
+    } catch {
+      days.push({ date: dateStr, income: 0, expense: 0 })
+    }
+  }
+  trendDays.value = days
+}
+
 async function fetchStats() {
   loading.value = true
   try {
     const res = await getStatistics(dateRange.value[0], dateRange.value[1])
     stats.value = res.data.data
     fetchDailyStats()
+    fetchTrend()
   } catch {
     // 401 handled by interceptor redirect
   } finally {
@@ -260,10 +336,30 @@ onMounted(fetchStats)
     </div>
 
     <template v-else-if="stats">
-      <div class="summary-row">
-        <StatCard label="收入" :value="formatMoney(stats.totalIncome)" icon="up" variant="income" />
-        <StatCard label="支出" :value="formatMoney(stats.totalExpense)" icon="down" variant="expense" />
-        <StatCard label="结余" :value="formatMoney(stats.totalIncome - stats.totalExpense)" icon="balance" variant="balance" />
+      <div class="stats-inline">
+        <div class="stats-inline-item income">
+          <span class="stats-inline-label">收入</span>
+          <span class="stats-inline-value">{{ formatMoney(stats.totalIncome) }}</span>
+        </div>
+        <div class="stats-inline-divider" />
+        <div class="stats-inline-item expense">
+          <span class="stats-inline-label">支出</span>
+          <span class="stats-inline-value">{{ formatMoney(stats.totalExpense) }}</span>
+        </div>
+        <div class="stats-inline-divider" />
+        <div class="stats-inline-item balance">
+          <span class="stats-inline-label">结余</span>
+          <span class="stats-inline-value">{{ formatMoney(stats.totalIncome - stats.totalExpense) }}</span>
+        </div>
+      </div>
+
+      <div v-if="trendDays.length" class="card trend-card">
+        <h3 class="card-title">近7天趋势</h3>
+        <div class="trend-chart-wrap">
+          <div class="trend-chart-container">
+            <Line :data="trendData" :options="trendOptions" />
+          </div>
+        </div>
       </div>
 
       <div class="chart-grid">
@@ -413,11 +509,48 @@ onMounted(fetchStats)
   margin-bottom: 20px;
 }
 
-.summary-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
+.stats-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.stats-inline-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.stats-inline-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.stats-inline-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.stats-inline-item.income .stats-inline-value { color: var(--income); }
+.stats-inline-item.expense .stats-inline-value { color: var(--expense); }
+.stats-inline-item.balance .stats-inline-value { color: var(--text-primary); }
+.stats-inline-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border-light);
+}
+
+.trend-chart-wrap {
+  padding: 8px 0 4px;
+}
+.trend-chart-container {
+  height: 200px;
+}
+.trend-card {
+  margin-bottom: 16px;
 }
 
 .chart-grid {
@@ -426,12 +559,19 @@ onMounted(fetchStats)
   gap: 16px;
   margin-bottom: 16px;
 }
+.stats-inline + .card,
+.chart-grid + .card {
+  margin-top: 16px;
+}
 
 .card {
   background: #fff;
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.card + .card {
+  margin-top: 16px;
 }
 
 .card-title {
