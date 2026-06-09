@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { getAccounts } from '@/api/account'
 import { getRecords, getStatistics } from '@/api/record'
 import { getCategories } from '@/api/category'
-import { formatMoney, formatDate, formatDateGroup, getLocalDateString } from '@/utils/format'
+import { formatMoney, formatDate, formatDateGroup, formatDateRelative, extractTime, getLocalDateString } from '@/utils/format'
 import StatCard from '@/components/StatCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -39,7 +39,7 @@ const groupedRecords = computed(() => {
   const groups: { date: string; items: RecordItem[] }[] = []
   let lastDate = ''
   for (const r of recentRecords.value) {
-    const date = formatDateGroup(r.recordTime)
+    const date = formatDateRelative(r.recordTime)
     if (date !== lastDate) {
       groups.push({ date, items: [] })
       lastDate = date
@@ -220,6 +220,7 @@ onMounted(async () => {
                   <div class="record-meta">
                     <span class="record-category">{{ record.categoryName }}</span>
                     <span class="record-sub">{{ record.accountName }}{{ record.remark ? ' · ' + record.remark : '' }}</span>
+                    <span class="record-time">{{ extractTime(record.recordTime) }}</span>
                   </div>
                 </div>
                 <span :class="['record-amount', record.type]">
@@ -384,6 +385,7 @@ onMounted(async () => {
 .record-meta { display: flex; flex-direction: column; gap: 2px; }
 .record-category { font-size: 14px; font-weight: 500; color: var(--text-primary); }
 .record-sub { font-size: 12px; color: var(--text-secondary); }
+.record-time { font-size: 11px; color: var(--text-secondary); }
 
 .record-amount { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
 .record-amount.expense { color: var(--expense); }

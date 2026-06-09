@@ -20,7 +20,7 @@ export function formatDate(dateStr: string): string {
   return `${month}月${day}日 ${hours}:${mins}`
 }
 
-export function formatDateGroup(dateStr: string): string {
+export function formatDateRelative(dateStr: string): string {
   const d = new Date(dateStr)
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -30,4 +30,14 @@ export function formatDateGroup(dateStr: string): string {
   if (diff === 1) return '昨天'
   if (diff < 7) return `${Math.floor(diff)}天前`
   return `${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+export function formatDateGroup(dateStr: string): string {
+  const time = extractTime(dateStr)
+  return `${formatDateRelative(dateStr)} ${time}`
+}
+
+export function extractTime(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
