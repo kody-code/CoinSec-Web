@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { createRecord, updateRecord } from '@/api/record'
 import { getCategories } from '@/api/category'
 import { getAccounts } from '@/api/account'
 import CategoryIcon from '@/components/CategoryIcon.vue'
 import { accountColorList } from '@/utils/colors'
-import { formatMoney } from '@/utils/format'
+import { formatMoney, getLocalDateString } from '@/utils/format'
 import type { Category, Account, RecordItem } from '@/types'
 import { ElMessage } from 'element-plus'
 import ClockPicker from '@/components/ClockPicker.vue'
@@ -24,8 +25,7 @@ const accounts = ref<Account[]>([])
 const loading = ref(false)
 
 function getDefaultDate() {
-  const now = new Date()
-  return now.toISOString().slice(0, 10)
+  return getLocalDateString()
 }
 
 function getDefaultTime() {
@@ -36,8 +36,9 @@ function getDefaultTime() {
 const typeFilter = ref('expense')
 
 function getDefaultAccountId(type: string): number {
-  const key = type === 'expense' ? 'defaultExpenseAccountId' : 'defaultIncomeAccountId'
-  return Number(localStorage.getItem(key)) || 0
+  const auth = useAuthStore()
+  if (type === 'expense') return auth.user?.defaultExpenseAccountId || 0
+  return auth.user?.defaultIncomeAccountId || 0
 }
 
 const form = ref({
@@ -142,7 +143,7 @@ onMounted(async () => {
         form.value.remark = record.remark || ''
         if (record.recordTime) {
           const d = new Date(record.recordTime)
-          form.value.recordDate = d.toISOString().slice(0, 10)
+          form.value.recordDate = getLocalDateString(d)
           form.value.recordTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
         }
         typeFilter.value = record.type
@@ -156,7 +157,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="form-page">
+  <div :class="['form-page', { 'form-page-native': isNative }]">
+    <div v-if="isNative" class="app-form-header">
+      <button class="app-form-close" @click="router.back()">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+      <span class="app-form-title">{{ isEdit ? '编辑记录' : '记一笔' }}</span>
+      <div style="width:24px" />
+    </div>
     <div class="form-header">
       <button v-if="!isNative" class="back-btn" @click="router.back()">
         <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
@@ -278,10 +286,36 @@ onMounted(async () => {
     >
       {{ loading ? '保存中...' : (isEdit ? '保存修改' : '确认记账') }}
     </button>
+    <div v-if="isNative" class="app-bottom-safe" />
   </div>
 </template>
 
 <style scoped>
+.form-page-native {
+  max-width: 100%;
+  padding: 0 16px;
+}
+.app-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  margin-bottom: 8px;
+}
+.app-form-close {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+}
+.app-form-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .form-page {
   max-width: 720px;
   margin: 0 auto;

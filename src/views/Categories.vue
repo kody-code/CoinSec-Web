@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { isNativeApp } from '@/utils/platform'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
 import CategoryIcon from '@/components/CategoryIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -7,11 +8,35 @@ import type { Category } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const categories = ref<Category[]>([])
+const isNative = isNativeApp()
 const activeTab = ref('expense')
 const loading = ref(false)
 const showForm = ref(false)
 const editing = ref<Category | null>(null)
 const form = ref({ name: '', icon: '' })
+
+const categoryIcons: Record<string, string> = {
+  restaurant: '餐饮',
+  shopping_cart: '购物',
+  local_taxi: '出行',
+  flight: '旅行',
+  local_hospital: '医疗',
+  school: '教育',
+  sports_esports: '娱乐',
+  checkroom: '服饰',
+  home: '居住',
+  bolt: '水电',
+  payments: '金融',
+  savings: '储蓄',
+  credit_score: '信用',
+  card_giftcard: '礼物',
+  pets: '宠物',
+  spa: '美容',
+  exercise: '健身',
+  diversity_3: '社交',
+  newspaper: '订阅',
+  more_horiz: '其他',
+}
 
 const filtered = ref<Category[]>([])
 
@@ -69,7 +94,7 @@ onMounted(fetch)
 </script>
 
 <template>
-  <div class="cat-page">
+  <div :class="['cat-page', { 'cat-page-native': isNative }]">
     <div class="tab-bar">
       <button :class="['tab-btn', { active: activeTab === 'expense' }]" @click="activeTab = 'expense'; filter()">支出</button>
       <button :class="['tab-btn', { active: activeTab === 'income' }]" @click="activeTab = 'income'; filter()">收入</button>
@@ -96,7 +121,18 @@ onMounted(fetch)
           <el-input v-model="form.name" placeholder="如：餐饮" />
         </el-form-item>
         <el-form-item label="图标">
-          <el-input v-model="form.icon" placeholder="图标名称（如 restaurant）" />
+          <div class="icon-grid">
+            <button
+              v-for="(label, icon) in categoryIcons"
+              :key="icon"
+              type="button"
+              :class="['icon-option', { active: form.icon === icon }]"
+              @click.stop="form.icon = icon"
+            >
+              <span class="material-symbols-rounded" style="font-size:24px">{{ icon }}</span>
+              <span class="icon-label">{{ label }}</span>
+            </button>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -104,6 +140,7 @@ onMounted(fetch)
         <el-button type="primary" :loading="loading" @click="save">保存</el-button>
       </template>
     </el-dialog>
+    <div v-if="isNative" class="app-bottom-safe" />
   </div>
 </template>
 
@@ -239,5 +276,45 @@ onMounted(fetch)
   .cat-actions { display: flex !important; }
 }
 
+.cat-page-native {
+  padding: 0 16px;
+}
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.icon-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 6px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text-secondary);
+  font-family: inherit;
+}
+.icon-option:hover {
+  border-color: var(--primary-light);
+  background: var(--primary-bg);
+}
+.icon-option.active {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+.icon-label {
+  font-size: 11px;
+  color: inherit;
+  white-space: nowrap;
+}
 
 </style>

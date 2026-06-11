@@ -4,6 +4,8 @@ export interface UserInfo {
   nickname: string
   avatar: string | null
   createTime: string
+  defaultExpenseAccountId?: number | null
+  defaultIncomeAccountId?: number | null
 }
 
 export interface AuthResponse {

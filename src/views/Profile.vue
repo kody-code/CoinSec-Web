@@ -1,17 +1,27 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { updateNickname, updatePassword, uploadAvatar } from '@/api/user'
+import { updateNickname, updatePassword, uploadAvatar, setDefaultAccounts } from '@/api/user'
 import { getAccounts } from '@/api/account'
 import { formatMoney } from '@/utils/format'
 import { getApiBaseUrl } from '@/api/base'
 import { Capacitor } from '@capacitor/core'
 import type { Account } from '@/types'
-import { ElMessage } from 'element-plus'
+import { isNativeApp } from '@/utils/platform'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { hasPin, setPin, clearPin, getConfiguredTimeout, setConfiguredTimeout, getBiometricEnabled, setBiometricEnabled, isBiometricAvailable, triggerLock } from '@/utils/pin'
 
+declare const __APP_VERSION__: string
+
+const router = useRouter()
 const auth = useAuthStore()
+const isNative = isNativeApp()
 const nickVal = ref('')
+const nickEditing = ref(false)
+const nickInput = ref<HTMLInputElement>()
 const pwForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const pwDialogVisible = ref(false)
 const nickLoading = ref(false)
 const pwLoading = ref(false)
 
@@ -39,6 +49,102 @@ function onAvatarError() {
 const accounts = ref<Account[]>([])
 const defaultExpenseId = ref(0)
 const defaultIncomeId = ref(0)
+
+const pinEnabled = ref(hasPin())
+const pinDialogVisible = ref(false)
+const pinDigits = ref(['', '', '', ''])
+const pinConfirmDigits = ref(['', '', '', ''])
+const pinStep = ref<'set' | 'confirm'>('set')
+const pinInputs = ref<(HTMLInputElement | null)[]>([])
+const pinConfirmInputs = ref<(HTMLInputElement | null)[]>([])
+const pinTimeout = ref(getConfiguredTimeout())
+const bioEnabled = ref(getBiometricEnabled())
+const bioAvailable = ref(false)
+const appShowPrefs = ref(false)
+
+onMounted(async () => {
+  bioAvailable.value = await isBiometricAvailable()
+})
+
+function onPinInput(idx: number, digits: string[], nextRefs: (HTMLInputElement | null)[]) {
+  if (digits[idx] && idx < 3) {
+    nextRefs[idx + 1]?.focus()
+  }
+}
+
+function onPinKeydown(e: KeyboardEvent, idx: number, digits: string[], prevRefs: (HTMLInputElement | null)[]) {
+  if (e.key === 'Backspace' && !digits[idx] && idx > 0) {
+    prevRefs[idx - 1]?.focus()
+  }
+}
+
+function resetPinForm() {
+  pinDigits.value = ['', '', '', '']
+  pinConfirmDigits.value = ['', '', '', '']
+  pinStep.value = 'set'
+}
+
+function nextPinStep() {
+  if (pinDigits.value.some(d => !d)) {
+    ElMessage.warning('请输入完整 PIN')
+    return
+  }
+  pinStep.value = 'confirm'
+  nextTick(() => (document.querySelector<HTMLInputElement>('.pin-confirm-box')?.focus()))
+}
+
+async function handleSetPin() {
+  if (pinConfirmDigits.value.some(d => !d)) {
+    ElMessage.warning('请确认 PIN')
+    return
+  }
+  const pin = pinDigits.value.join('')
+  const confirm = pinConfirmDigits.value.join('')
+  if (pin !== confirm) {
+    ElMessage.warning('两次输入不一致')
+    pinConfirmDigits.value = ['', '', '', '']
+    pinStep.value = 'set'
+    return
+  }
+  await setPin(pin)
+  pinEnabled.value = true
+  pinDialogVisible.value = false
+  resetPinForm()
+  ElMessage.success('PIN 已设置')
+}
+
+async function handleRemovePin() {
+  try {
+    await ElMessageBox.confirm('确定关闭应用锁？', '提示')
+    clearPin()
+    pinEnabled.value = false
+    ElMessage.success('PIN 已关闭')
+  } catch { /* cancel */ }
+}
+
+function handleTimeoutChange(val: number) {
+  setConfiguredTimeout(val)
+  ElMessage.success(`闲置超时已设为 ${val} 分钟`)
+}
+
+async function handleBioToggle(val: boolean) {
+  if (val && !bioAvailable.value) {
+    ElMessage.warning('设备不支持生物识别')
+    return
+  }
+  setBiometricEnabled(val)
+  bioEnabled.value = val
+  ElMessage.success(val ? '生物识别已开启' : '生物识别已关闭')
+}
+
+async function handleLogout() {
+  try {
+    await ElMessageBox.confirm('确定退出登录？', '提示')
+    await auth.logout()
+    router.push('/login')
+  } catch { /* cancel */ }
+}
+
 
 function triggerUpload() {
   avatarInput.value?.click()
@@ -71,18 +177,28 @@ async function handleAvatarChange(e: Event) {
 }
 
 function loadDefaults() {
-  defaultExpenseId.value = Number(localStorage.getItem('defaultExpenseAccountId')) || 0
-  defaultIncomeId.value = Number(localStorage.getItem('defaultIncomeAccountId')) || 0
+  defaultExpenseId.value = auth.user?.defaultExpenseAccountId || 0
+  defaultIncomeId.value = auth.user?.defaultIncomeAccountId || 0
 }
 
-function saveDefault(type: 'expense' | 'income') {
-  const key = type === 'expense' ? 'defaultExpenseAccountId' : 'defaultIncomeAccountId'
-  const val = type === 'expense' ? defaultExpenseId.value : defaultIncomeId.value
-  if (val > 0) {
-    localStorage.setItem(key, String(val))
-  } else {
-    localStorage.removeItem(key)
+async function saveDefault() {
+  const payload = {
+    defaultExpenseAccountId: defaultExpenseId.value || null,
+    defaultIncomeAccountId: defaultIncomeId.value || null,
   }
+  try {
+    await setDefaultAccounts(payload)
+    await auth.fetchUser()
+    ElMessage.success('默认账户已更新')
+  } catch {
+    ElMessage.error('保存失败')
+  }
+}
+
+function startEditNick() {
+  if (auth.user) nickVal.value = auth.user.nickname || ''
+  nickEditing.value = true
+  nextTick(() => nickInput.value?.focus())
 }
 
 async function saveNickname() {
@@ -92,7 +208,13 @@ async function saveNickname() {
     await updateNickname({ nickname: nickVal.value })
     await auth.fetchUser()
     ElMessage.success('昵称已更新')
+    nickEditing.value = false
   } finally { nickLoading.value = false }
+}
+
+function cancelEditNick() {
+  nickEditing.value = false
+  if (auth.user) nickVal.value = auth.user.nickname || ''
 }
 
 async function savePassword() {
@@ -102,6 +224,7 @@ async function savePassword() {
   try {
     await updatePassword({ oldPassword: pwForm.value.oldPassword, newPassword: pwForm.value.newPassword })
     ElMessage.success('密码已修改')
+    pwDialogVisible.value = false
     pwForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
   } finally { pwLoading.value = false }
 }
@@ -117,7 +240,104 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="profile-page">
+  <!-- ========== 原生 APP ========== -->
+  <div v-if="isNative" class="app-profile-page">
+    <div class="app-profile-hero">
+      <div class="app-avatar-wrap" @click="triggerUpload">
+        <img v-if="avatarSrc() && !avatarFailed" :src="avatarSrc()!" class="app-avatar-img" @error="onAvatarError" />
+        <span v-else class="app-avatar-init">{{ auth.user?.nickname?.charAt(0) || 'U' }}</span>
+        <div class="app-avatar-overlay">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+      </div>
+      <input ref="avatarInput" type="file" accept="image/*" style="display:none" @change="handleAvatarChange" />
+      <div class="app-profile-info">
+        <div v-if="nickEditing" class="nick-edit-inline">
+          <input ref="nickInput" v-model="nickVal" class="nick-input" maxlength="20" @keyup.enter="saveNickname" @keyup.escape="cancelEditNick" @blur="saveNickname" />
+        </div>
+        <h2 v-else>
+          {{ auth.user?.nickname || '用户' }}
+          <button class="nick-edit-btn" @click="startEditNick">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          </button>
+        </h2>
+        <p class="app-profile-username">@{{ auth.user?.username }}</p>
+      </div>
+    </div>
+
+    <div class="app-profile-section">
+      <div class="app-profile-card" @click="pwDialogVisible = true; pwForm = { oldPassword: '', newPassword: '', confirmPassword: '' }">
+        <div class="app-profile-card-icon password">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <div class="app-profile-card-body">
+          <span class="app-profile-card-label">密码</span>
+          <span class="app-profile-card-value">••••••••</span>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" class="app-chevron"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <div class="app-profile-card">
+        <div class="app-profile-card-icon lock">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="app-profile-card-body">
+          <span class="app-profile-card-label">应用锁</span>
+          <span class="app-profile-card-value">{{ pinEnabled ? '已开启' : '已关闭' }}</span>
+        </div>
+        <span class="app-profile-card-badge" @click.stop="pinDialogVisible = true; resetPinForm()">{{ pinEnabled ? '修改' : '设置' }}</span>
+      </div>
+
+      <div class="app-profile-card" @click="appShowPrefs = !appShowPrefs">
+        <div class="app-profile-card-icon pref">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </div>
+        <div class="app-profile-card-body">
+          <span class="app-profile-card-label">默认账户</span>
+          <span class="app-profile-card-value">记账时自动选中的账户</span>
+        </div>
+        <svg :class="['app-chevron', { open: appShowPrefs }]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div v-if="appShowPrefs" class="app-pref-fields">
+        <div class="app-pref-field">
+          <label class="app-pref-label">默认支出账户</label>
+          <el-select v-model="defaultExpenseId" @change="saveDefault()" placeholder="不设置" style="width:100%">
+            <el-option :value="0" label="不设置" />
+            <el-option v-for="acct in accounts" :key="acct.accountId" :value="acct.accountId" :label="acct.name" />
+          </el-select>
+        </div>
+        <div class="app-pref-field">
+          <label class="app-pref-label">默认收入账户</label>
+          <el-select v-model="defaultIncomeId" @change="saveDefault()" placeholder="不设置" style="width:100%">
+            <el-option :value="0" label="不设置" />
+            <el-option v-for="acct in accounts" :key="acct.accountId" :value="acct.accountId" :label="acct.name" />
+          </el-select>
+        </div>
+      </div>
+
+      <div class="app-profile-card info-list">
+        <div class="app-info-row">
+          <span class="app-info-label">用户名</span>
+          <span class="app-info-value">{{ auth.user?.username }}</span>
+        </div>
+        <div class="app-info-row">
+          <span class="app-info-label">注册时间</span>
+          <span class="app-info-value">{{ auth.user?.createTime ? new Date(auth.user.createTime).toLocaleDateString('zh-CN') : '—' }}</span>
+        </div>
+        <div class="app-info-row">
+          <span class="app-info-label">应用版本</span>
+          <span class="app-info-value">v{{ __APP_VERSION__ }}</span>
+        </div>
+      </div>
+
+      <button class="app-logout-btn" @click="handleLogout">退出登录</button>
+    </div>
+
+    <div class="app-bottom-safe" />
+  </div>
+
+  <!-- ========== Web 端 ========== -->
+  <div v-else class="profile-page">
     <div class="profile-hero">
       <div class="profile-avatar-large" :class="{ uploading }" @click="triggerUpload">
         <img v-if="avatarSrc() && !avatarFailed" :src="avatarSrc()!" class="avatar-img" @error="onAvatarError" />
@@ -134,30 +354,28 @@ onMounted(async () => {
       </div>
       <input ref="avatarInput" type="file" accept="image/*" style="display:none" @change="handleAvatarChange" />
       <div class="profile-info">
-        <h2>{{ auth.user?.nickname || '用户' }}</h2>
+        <div v-if="nickEditing" class="nick-edit-inline">
+          <input
+            ref="nickInput"
+            v-model="nickVal"
+            class="nick-input"
+            maxlength="20"
+            @keyup.enter="saveNickname"
+            @keyup.escape="cancelEditNick"
+            @blur="saveNickname"
+          />
+        </div>
+        <h2 v-else>
+          {{ auth.user?.nickname || '用户' }}
+          <button class="nick-edit-btn" @click="startEditNick">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          </button>
+        </h2>
         <p class="profile-username">@{{ auth.user?.username }}</p>
       </div>
     </div>
 
-    <div class="profile-card">
-      <div class="card-icon-row">
-        <div class="card-icon-wrap nickname">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </div>
-        <div class="card-content">
-          <span class="card-label">昵称</span>
-          <span class="card-value">{{ auth.user?.nickname || '未设置' }}</span>
-        </div>
-      </div>
-      <div class="card-edit-row">
-        <input v-model="nickVal" placeholder="输入新昵称" class="field-input" />
-        <button class="save-btn" :disabled="nickLoading" @click="saveNickname">
-          {{ nickLoading ? '保存中...' : '保存' }}
-        </button>
-      </div>
-    </div>
-
-    <div class="profile-card">
+    <div class="profile-card clickable" @click="pwDialogVisible = true; pwForm = { oldPassword: '', newPassword: '', confirmPassword: '' }">
       <div class="card-icon-row">
         <div class="card-icon-wrap password">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
@@ -167,15 +385,95 @@ onMounted(async () => {
           <span class="card-value">••••••••</span>
         </div>
       </div>
-      <div class="card-edit-row stacked">
+    </div>
+
+    <el-dialog v-model="pwDialogVisible" title="修改密码" width="360px">
+      <div class="pw-dialog-body">
         <input v-model="pwForm.oldPassword" type="password" placeholder="原密码" class="field-input" />
         <input v-model="pwForm.newPassword" type="password" placeholder="新密码" class="field-input" />
         <input v-model="pwForm.confirmPassword" type="password" placeholder="确认新密码" class="field-input" />
-        <button class="save-btn" :disabled="pwLoading" @click="savePassword">
-          {{ pwLoading ? '修改中...' : '修改密码' }}
-        </button>
+      </div>
+      <template #footer>
+        <el-button @click="pwDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="pwLoading" @click="savePassword">确认修改</el-button>
+      </template>
+    </el-dialog>
+
+    <div class="profile-card">
+      <div class="card-icon-row">
+        <div class="card-icon-wrap lock">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="card-content">
+          <span class="card-label">应用锁</span>
+          <span class="card-value">{{ pinEnabled ? '已开启' : '已关闭' }}</span>
+        </div>
+        <div class="card-actions">
+          <button class="card-action-btn" @click="pinDialogVisible = true; resetPinForm()">
+            {{ pinEnabled ? '修改' : '设置' }}
+          </button>
+          <button v-if="pinEnabled" class="card-action-btn" @click="triggerLock">锁定</button>
+          <button v-if="pinEnabled" class="card-action-btn danger" @click="handleRemovePin">关闭</button>
+        </div>
+      </div>
+      <div class="pref-row" style="margin-top:8px">
+        <div class="pref-field">
+          <label class="pref-label">闲置自动锁定</label>
+          <el-select v-model="pinTimeout" @change="handleTimeoutChange" style="width: 100%">
+            <el-option :value="1" label="1 分钟" />
+            <el-option :value="5" label="5 分钟" />
+            <el-option :value="15" label="15 分钟" />
+            <el-option :value="30" label="30 分钟" />
+          </el-select>
+        </div>
+      </div>
+      <div v-if="pinEnabled" class="pref-row" style="margin-top:8px">
+        <div class="pref-field">
+          <label class="pref-label">生物识别解锁</label>
+          <el-switch
+            :model-value="bioEnabled"
+            :disabled="!bioAvailable"
+            @update:model-value="handleBioToggle"
+          />
+        </div>
       </div>
     </div>
+
+    <el-dialog v-model="pinDialogVisible" title="设置应用锁 PIN" width="360px" @closed="resetPinForm">
+      <div class="pin-dialog-body">
+        <p class="pin-dialog-label">{{ pinStep === 'set' ? '设置 PIN' : '再次输入确认' }}</p>
+        <div class="pin-box-row">
+          <input
+            v-for="i in 4" :key="'pin-' + i"
+            ref="pinInputs"
+            v-model="pinDigits[i - 1]"
+            type="password"
+            class="pin-digit-box"
+            maxlength="1"
+            :class="{ 'pin-confirm-box': pinStep === 'confirm' }"
+            @input="onPinInput(i - 1, pinDigits, pinInputs)"
+            @keydown="onPinKeydown($event, i - 1, pinDigits, pinInputs)"
+          />
+        </div>
+        <div v-if="pinStep === 'confirm'" class="pin-box-row" style="margin-top:16px">
+          <input
+            v-for="i in 4" :key="'cnf-' + i"
+            ref="pinConfirmInputs"
+            v-model="pinConfirmDigits[i - 1]"
+            type="password"
+            class="pin-digit-box"
+            maxlength="1"
+            @input="onPinInput(i - 1, pinConfirmDigits, pinConfirmInputs)"
+            @keydown="onPinKeydown($event, i - 1, pinConfirmDigits, pinConfirmInputs)"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="pinDialogVisible = false; resetPinForm()">取消</el-button>
+        <el-button v-if="pinStep === 'set'" type="primary" @click="nextPinStep">下一步</el-button>
+        <el-button v-else type="primary" @click="handleSetPin">确认</el-button>
+      </template>
+    </el-dialog>
 
     <div class="profile-card">
       <div class="card-icon-row">
@@ -190,14 +488,14 @@ onMounted(async () => {
       <div class="pref-row">
         <div class="pref-field">
           <label class="pref-label">默认支出账户</label>
-          <el-select v-model="defaultExpenseId" @change="saveDefault('expense')" placeholder="不设置" style="width: 100%">
+          <el-select v-model="defaultExpenseId" @change="saveDefault()" placeholder="不设置" style="width: 100%">
             <el-option :value="0" label="不设置" />
             <el-option v-for="acct in accounts" :key="acct.accountId" :value="acct.accountId" :label="`${acct.name} (${formatMoney(acct.balance)})`" />
           </el-select>
         </div>
         <div class="pref-field">
           <label class="pref-label">默认收入账户</label>
-          <el-select v-model="defaultIncomeId" @change="saveDefault('income')" placeholder="不设置" style="width: 100%">
+          <el-select v-model="defaultIncomeId" @change="saveDefault()" placeholder="不设置" style="width: 100%">
             <el-option :value="0" label="不设置" />
             <el-option v-for="acct in accounts" :key="acct.accountId" :value="acct.accountId" :label="`${acct.name} (${formatMoney(acct.balance)})`" />
           </el-select>
@@ -331,8 +629,43 @@ onMounted(async () => {
   font-size: 20px;
   font-weight: 600;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   position: relative;
   z-index: 1;
+}
+
+.nick-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-hint);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.nick-edit-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg);
+}
+
+.nick-edit-inline {
+  width: 100%;
+}
+.nick-input {
+  width: 100%;
+  font-size: 20px;
+  font-weight: 600;
+  border: 2px solid var(--primary);
+  border-radius: 8px;
+  padding: 6px 10px;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  box-sizing: border-box;
 }
 
 .profile-username {
@@ -368,14 +701,14 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.card-icon-wrap.nickname {
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-
 .card-icon-wrap.password {
   background: var(--expense-bg);
   color: var(--expense);
+}
+
+.card-icon-wrap.lock {
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
 .card-icon-wrap.preference {
@@ -401,13 +734,77 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
-.card-edit-row {
+.card-actions {
   display: flex;
-  gap: 10px;
+  gap: 6px;
+  margin-left: auto;
+}
+.card-action-btn {
+  background: var(--bg);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.card-action-btn:hover {
+  background: var(--primary-bg);
+}
+.card-action-btn.danger {
+  color: var(--expense);
+}
+.card-action-btn.danger:hover {
+  background: var(--expense-bg);
 }
 
-.card-edit-row.stacked {
+.profile-card.clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.profile-card.clickable:hover {
+  background: var(--bg);
+}
+
+.pin-dialog-body {
+  display: flex;
   flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+}
+.pin-dialog-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+}
+.pin-box-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.pin-digit-box {
+  width: 48px;
+  height: 54px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  border: 2px solid var(--border-light);
+  border-radius: 12px;
+  outline: none;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+.pin-digit-box:focus {
+  border-color: var(--primary);
+}
+
+.pw-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .field-input {
@@ -495,6 +892,165 @@ onMounted(async () => {
   font-weight: 500;
   color: var(--text-primary);
 }
+
+/* ====== 原生布局 ====== */
+.app-profile-page {
+  padding: 24px 16px 0;
+}
+.app-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.app-avatar-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.app-avatar-img, .app-avatar-init {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent-deep));
+  color: #fff;
+}
+.app-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.app-avatar-wrap:hover .app-avatar-overlay { opacity: 1; }
+
+.app-profile-info h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.app-profile-username {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.app-profile-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--card-bg);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.app-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  min-height: 48px;
+}
+.app-profile-card:hover { background: var(--bg); }
+.app-profile-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.app-profile-card-icon.password { background: var(--expense-bg); color: var(--expense); }
+.app-profile-card-icon.lock { background: var(--accent-bg); color: var(--accent); }
+.app-profile-card-icon.pref { background: var(--income-bg); color: var(--income); }
+.app-profile-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.app-profile-card-label { font-size: 15px; font-weight: 500; color: var(--text-primary); }
+.app-profile-card-value { font-size: 13px; color: var(--text-secondary); }
+.app-profile-card-badge {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--primary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--primary-bg);
+}
+.app-chevron { color: var(--text-hint); flex-shrink: 0; transition: transform 0.2s; }
+.app-chevron.open { transform: rotate(90deg); }
+
+.app-pref-fields {
+  padding: 4px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border-light);
+}
+.app-pref-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.app-pref-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.app-profile-card.info-list {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  cursor: default;
+}
+.app-profile-card.info-list:hover { background: transparent; }
+.app-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+}
+.app-info-row + .app-info-row { border-top: 1px solid var(--border-light); }
+.app-info-label { font-size: 14px; color: var(--text-secondary); }
+.app-info-value { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+
+.app-logout-btn {
+  display: block;
+  width: 100%;
+  margin-top: 24px;
+  padding: 14px;
+  border: none;
+  border-radius: 14px;
+  background: var(--card-bg);
+  color: var(--expense);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.app-logout-btn:hover { background: var(--expense-bg); }
 
 @media (max-width: 768px) {
   .profile-page { max-width: 100%; }

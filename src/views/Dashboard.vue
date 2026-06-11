@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { getAccounts } from '@/api/account'
 import { getRecords, getStatistics } from '@/api/record'
 import { getCategories } from '@/api/category'
-import { formatMoney, formatDate, formatDateGroup } from '@/utils/format'
+import { formatMoney, formatDate, formatDateGroup, formatDateRelative, extractTime, getLocalDateString } from '@/utils/format'
+import { colors } from '@/utils/colors'
 import StatCard from '@/components/StatCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -12,6 +13,19 @@ import AccountIcon from '@/components/AccountIcon.vue'
 import CategoryIcon from '@/components/CategoryIcon.vue'
 import { isNativeApp } from '@/utils/platform'
 import type { Account, Category, RecordItem, Statistics } from '@/types'
+import { Line } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js'
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
 const router = useRouter()
 
@@ -21,6 +35,7 @@ const stats = ref<Statistics | null>(null)
 const loading = ref(true)
 
 const isNative = isNativeApp()
+const trendDays = ref<{ date: string; income: number; expense: number }[]>([])
 const appShowAllAccounts = ref(false)
 
 const totalBalance = computed(() => {
@@ -35,11 +50,70 @@ const categoryIconMap = computed(() => {
   return map
 })
 
+const trendData = computed(() => ({
+  labels: trendDays.value.map(d => {
+    const parts = d.date.split('-')
+    return `${Number(parts[1])}/${Number(parts[2])}`
+  }),
+  datasets: [
+    {
+      label: '收入',
+      data: trendDays.value.map(d => d.income),
+      borderColor: colors.income,
+      backgroundColor: colors.income + '20',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+    },
+    {
+      label: '支出',
+      data: trendDays.value.map(d => d.expense),
+      borderColor: colors.expense,
+      backgroundColor: colors.expense + '20',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+    },
+  ],
+}))
+
+const trendOptions = {
+  plugins: {
+    legend: {
+      display: true,
+      position: 'top' as const,
+      labels: { boxWidth: 12, padding: 12, font: { size: 12 } },
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx: any) => `${ctx.dataset.label}: ${formatMoney(ctx.raw)}`,
+      },
+    },
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { font: { size: 11 } },
+    },
+    y: {
+      grid: { color: '#f1f5f9' },
+      ticks: {
+        font: { size: 11 },
+        callback: (v: any) => formatMoney(v),
+      },
+    },
+  },
+  responsive: true,
+  maintainAspectRatio: false,
+}
+
 const groupedRecords = computed(() => {
   const groups: { date: string; items: RecordItem[] }[] = []
   let lastDate = ''
   for (const r of recentRecords.value) {
-    const date = formatDateGroup(r.recordTime)
+    const date = formatDateRelative(r.recordTime)
     if (date !== lastDate) {
       groups.push({ date, items: [] })
       lastDate = date
@@ -49,11 +123,29 @@ const groupedRecords = computed(() => {
   return groups
 })
 
+async function fetchTrend() {
+  const days: { date: string; income: number; expense: number }[] = []
+  const today = new Date()
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dateStr = getLocalDateString(d)
+    try {
+      const res = await getStatistics(dateStr, dateStr)
+      const s = res.data.data
+      days.push({ date: dateStr, income: s.totalIncome, expense: s.totalExpense })
+    } catch {
+      days.push({ date: dateStr, income: 0, expense: 0 })
+    }
+  }
+  trendDays.value = days
+}
+
 onMounted(async () => {
   try {
     const now = new Date()
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-    const today = now.toISOString().slice(0, 10)
+    const today = getLocalDateString(now)
 
     const [acctRes, recRes, statRes, catRes] = await Promise.all([
       getAccounts(),
@@ -65,6 +157,8 @@ onMounted(async () => {
     recentRecords.value = recRes.data.data.content
     stats.value = statRes.data.data
     categories.value = catRes.data.data
+
+    fetchTrend()
   } catch {
     // 401 handled by interceptor redirect
   } finally {
@@ -171,6 +265,17 @@ onMounted(async () => {
         <StatCard label="结余" :value="stats ? formatMoney(stats.totalIncome - stats.totalExpense) : '—'" icon="balance" variant="balance" />
       </div>
 
+      <div class="section-card trend-card">
+        <div class="section-header">
+          <h3>近7天趋势</h3>
+        </div>
+        <div class="trend-chart-wrap">
+          <div class="trend-chart-container">
+            <Line :data="trendData" :options="trendOptions" />
+          </div>
+        </div>
+      </div>
+
       <div v-if="loading" class="loading-wrap">
         <LoadingSkeleton :rows="2" />
       </div>
@@ -220,6 +325,7 @@ onMounted(async () => {
                   <div class="record-meta">
                     <span class="record-category">{{ record.categoryName }}</span>
                     <span class="record-sub">{{ record.accountName }}{{ record.remark ? ' · ' + record.remark : '' }}</span>
+                    <span class="record-time">{{ extractTime(record.recordTime) }}</span>
                   </div>
                 </div>
                 <span :class="['record-amount', record.type]">
@@ -263,11 +369,21 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.trend-card {
+  margin-bottom: 16px;
+}
+.trend-chart-wrap {
+  padding: 8px 0 4px;
+}
+.trend-chart-container {
+  height: 200px;
+}
+
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .stat-grid > :nth-child(3) {
@@ -384,6 +500,7 @@ onMounted(async () => {
 .record-meta { display: flex; flex-direction: column; gap: 2px; }
 .record-category { font-size: 14px; font-weight: 500; color: var(--text-primary); }
 .record-sub { font-size: 12px; color: var(--text-secondary); }
+.record-time { font-size: 11px; color: var(--text-secondary); }
 
 .record-amount { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
 .record-amount.expense { color: var(--expense); }
