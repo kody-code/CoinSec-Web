@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { isNativeApp } from '@/utils/platform'
 import { getStatistics } from '@/api/record'
 import { formatMoney, getLocalDateString } from '@/utils/format'
-import { colors } from '@/utils/colors'
+import { colors, categoryPalette } from '@/utils/colors'
 import StatCard from '@/components/StatCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -29,6 +29,7 @@ const stats = ref<Statistics | null>(null)
 const dailyStats = ref<{ date: string; income: number; expense: number }[]>([])
 const trendDays = ref<{ date: string; income: number; expense: number }[]>([])
 const loading = ref(false)
+const chartMode = ref<'category' | 'incomeExpense'>('category')
 
 const today = new Date()
 const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
@@ -247,6 +248,24 @@ const barOptions = {
   maintainAspectRatio: false,
 }
 
+const catDonutData = computed(() => {
+  if (!stats.value?.categoryStats?.length) return null
+  const sorted = [...stats.value.categoryStats]
+    .filter(c => c.type === 'expense')
+    .sort((a, b) => b.total - a.total)
+  const top = sorted.slice(0, 8)
+  if (!top.length) return null
+  return {
+    labels: top.map(c => c.categoryName),
+    datasets: [{
+      data: top.map(c => c.total),
+      backgroundColor: top.map((_, i) => categoryPalette[i % categoryPalette.length]),
+      borderWidth: 0,
+      hoverOffset: 8,
+    }],
+  }
+})
+
 function getDaysInRange(start: string, end: string): string[] {
   const days: string[] = []
   const s = new Date(start)
@@ -362,10 +381,32 @@ onMounted(fetchStats)
         </div>
       </div>
 
-      <div class="chart-grid">
-        <div class="card">
-          <h3 class="card-title">收支占比</h3>
-          <div class="donut-wrapper">
+      <div class="category-row">
+        <div class="card toggle-card">
+          <div class="card-header-row">
+            <h3 class="card-title">{{ chartMode === 'category' ? '分类占比' : '收支占比' }}</h3>
+            <div class="chart-switch">
+              <button :class="['switch-btn', { active: chartMode === 'category' }]" @click="chartMode = 'category'">分类</button>
+              <button :class="['switch-btn', { active: chartMode === 'incomeExpense' }]" @click="chartMode = 'incomeExpense'">收支</button>
+            </div>
+          </div>
+          <div v-if="chartMode === 'category'" class="donut-wrapper">
+            <div v-if="catDonutData" class="donut-container">
+              <Doughnut :data="catDonutData" :options="donutOptions" />
+              <div class="donut-center">
+                <span class="donut-center-label">总支出</span>
+                <span class="donut-center-value">{{ formatMoney(stats.totalExpense) }}</span>
+              </div>
+            </div>
+            <div class="donut-legend">
+              <div v-for="(cat, i) in (stats.categoryStats ?? []).filter(c => c.type === 'expense').slice(0, 8)" :key="cat.categoryId" class="legend-item">
+                <span class="legend-dot" :style="{ background: categoryPalette[i % categoryPalette.length] }" />
+                <span>{{ cat.categoryName }}</span>
+                <span class="legend-val">{{ formatMoney(cat.total) }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="donut-wrapper">
             <div v-if="donutData" class="donut-container">
               <Doughnut :data="donutData" :options="donutOptions" />
               <div class="donut-center">
@@ -387,14 +428,26 @@ onMounted(fetchStats)
             </div>
           </div>
         </div>
-
-        <div class="card">
-          <h3 class="card-title">分类排行</h3>
-          <div class="bar-wrapper">
-            <div v-if="barData" class="bar-container">
-              <Bar :data="barData" :options="barOptions" />
+        <div class="card category-detail-card">
+          <h3 class="card-title">分类明细</h3>
+          <div v-for="(cat, i) in (stats.categoryStats ?? []).filter(c => c.type === 'expense')" :key="cat.categoryId" class="detail-row">
+            <div class="detail-left">
+              <span class="legend-dot" :style="{ background: categoryPalette[i % categoryPalette.length] }" />
+              <span class="detail-name">{{ cat.categoryName }}</span>
+              <span class="detail-count">{{ cat.count }}笔</span>
             </div>
-            <EmptyState v-else text="暂无分类数据" icon="category" />
+            <div class="detail-bar-wrap">
+              <div class="detail-bar-bg">
+                <div
+                  class="detail-bar-fill"
+                  :style="{ width: (cat.total / Math.max(stats.totalExpense, 0.01) * 100) + '%' }"
+                />
+              </div>
+            </div>
+            <div class="detail-right">
+              <span class="detail-amount">{{ formatMoney(cat.total) }}</span>
+              <span class="detail-percent">{{ (cat.total / Math.max(stats.totalExpense, 0.01) * 100).toFixed(1) }}%</span>
+            </div>
           </div>
         </div>
       </div>
@@ -408,30 +461,6 @@ onMounted(fetchStats)
         </div>
       </div>
 
-      <div class="card">
-        <h3 class="card-title">分类明细</h3>
-        <EmptyState v-if="!stats.categoryStats?.length" text="暂无数据" />
-        <div v-for="cat in stats.categoryStats" :key="cat.categoryId" class="detail-row">
-          <div class="detail-left">
-            <span :class="['detail-dot', cat.type]" />
-            <span class="detail-name">{{ cat.categoryName }}</span>
-            <span class="detail-count">{{ cat.count }}笔</span>
-          </div>
-          <div class="detail-bar-wrap">
-            <div class="detail-bar-bg">
-              <div
-                class="detail-bar-fill"
-                :class="cat.type"
-                :style="{ width: (cat.total / Math.max(cat.type === 'expense' ? stats.totalExpense : stats.totalIncome, 0.01) * 100) + '%' }"
-              />
-            </div>
-          </div>
-          <div class="detail-right">
-            <span class="detail-amount">{{ formatMoney(cat.total) }}</span>
-            <span class="detail-percent">{{ (cat.total / Math.max(cat.type === 'expense' ? stats.totalExpense : stats.totalIncome, 0.01) * 100).toFixed(1) }}%</span>
-          </div>
-        </div>
-      </div>
     </template>
 
     <EmptyState v-else text="暂无数据" />
@@ -561,9 +590,28 @@ onMounted(fetchStats)
   margin-bottom: 16px;
 }
 .stats-inline + .card,
-.chart-grid + .card {
+.chart-grid + .card,
+.toggle-card + .card {
   margin-top: 16px;
 }
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.card-header-row .card-title { margin-bottom: 0; }
+.chart-switch { display: flex; gap: 4px; }
+.switch-btn {
+  padding: 4px 12px; border: 1px solid var(--border); border-radius: 100px;
+  background: #fff; font-size: 12px; font-weight: 500; font-family: inherit;
+  color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
+}
+.switch-btn.active { background: var(--sidebar-bg); border-color: var(--sidebar-bg); color: #fff; }
+.category-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.category-detail-card { overflow: auto; max-height: 420px; }
+.category-detail-card .card-title { margin-bottom: 12px; }
 
 .card {
   background: #fff;
@@ -728,6 +776,7 @@ onMounted(fetchStats)
   .date-input { flex: 1; min-width: 0; }
   .summary-row { grid-template-columns: 1fr; }
   .chart-grid { grid-template-columns: 1fr; }
+  .category-row { grid-template-columns: 1fr; }
   .card { padding: 16px; }
 }
 

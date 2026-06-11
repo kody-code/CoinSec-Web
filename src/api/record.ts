@@ -9,6 +9,8 @@ export interface RecordQuery {
   startDate?: string
   endDate?: string
   accountId?: number
+  tagIds?: string
+  keyword?: string
 }
 
 export function getRecords(params: RecordQuery) {
@@ -22,6 +24,7 @@ export function createRecord(data: {
   amount: number
   remark?: string
   recordTime?: string
+  tagIds?: number[]
 }) {
   return request.post<ApiResult<{ recordId: number }>>('/records', data)
 }
@@ -33,6 +36,7 @@ export function updateRecord(id: number, data: {
   amount: number
   remark?: string
   recordTime?: string
+  tagIds?: number[]
 }) {
   return request.put<ApiResult<RecordItem>>(`/records/${id}`, data)
 }

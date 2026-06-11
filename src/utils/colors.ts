@@ -22,3 +22,10 @@ export const accountGradients = [
 ] as const
 
 export const accountColorList = [colors.accent, colors.income, colors.warning, colors.expense] as const
+
+export const categoryPalette = [
+  '#6366f1', '#f97316', '#10b981', '#ef4444', '#06b6d4',
+  '#eab308', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e',
+  '#3b82f6', '#84cc16', '#a855f7', '#f59e0b', '#0ea5e9',
+  '#78716c',
+] as const

@@ -336,30 +336,7 @@ onMounted(async () => {
           </template>
         </div>
 
-        <div class="section-card" v-if="stats && stats.categoryStats && stats.categoryStats.length > 0">
-          <div class="section-header">
-            <h3>分类排行</h3>
-            <button class="section-more" @click="router.push('/statistics')">详情 →</button>
-          </div>
-          <div class="category-rank">
-            <div
-              v-for="(cat, idx) in stats.categoryStats.slice(0, 5)"
-              :key="cat.categoryId"
-              class="rank-item"
-            >
-              <span class="rank-index">{{ idx + 1 }}</span>
-              <span class="rank-name">{{ cat.categoryName }}</span>
-              <div class="rank-bar-wrap">
-                <div
-                  class="rank-bar"
-                  :style="{ width: (cat.total / Math.max(...stats.categoryStats.map(c => c.total))) * 100 + '%' }"
-                />
-              </div>
-              <span class="rank-amount">{{ formatMoney(cat.total) }}</span>
-            </div>
-          </div>
-        </div>
-      </template>
+        </template>
 
       <button class="fab" @click="router.push('/records/new')">
         <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -506,25 +483,8 @@ onMounted(async () => {
 .record-amount.expense { color: var(--expense); }
 .record-amount.income { color: var(--income); }
 
-.category-rank { padding: 8px 20px 16px; }
-.rank-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-.rank-index {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-background: var(--border-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-.rank-name { font-size: 14px; font-weight: 500; color: var(--text-primary); width: 72px; flex-shrink: 0; }
-.rank-bar-wrap { flex: 1; height: 6px; border-radius: 3px; background: var(--border-light); overflow: hidden; }
-.rank-bar { height: 100%; border-radius: 3px; background: linear-gradient(135deg, var(--accent), var(--accent-light)); min-width: 4px; }
-.rank-amount { font-size: 13px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; width: 90px; text-align: right; flex-shrink: 0; }
+.rank-item .rank-bar-wrap .rank-bar-fill.income { background: var(--income); }
+.rank-item .rank-bar-wrap .rank-bar-fill.expense { background: var(--expense); }
 
 @media (min-width: 768px) {
   .stat-grid {

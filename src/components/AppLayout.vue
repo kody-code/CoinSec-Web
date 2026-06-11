@@ -45,8 +45,10 @@ const menuItems = [
   { path: '/dashboard', icon: 'Odometer', label: '首页' },
   { path: '/records', icon: 'Notebook', label: '账单' },
   { path: '/statistics', icon: 'DataAnalysis', label: '统计' },
+  { path: '/budgets', icon: 'Chart', label: '预算' },
   { path: '/accounts', icon: 'Wallet', label: '账户' },
   { path: '/categories', icon: 'Collection', label: '分类' },
+  { path: '/tags', icon: 'Label', label: '标签' },
   { path: '/profile', icon: 'User', label: '个人' },
 ]
 
@@ -89,6 +91,8 @@ function getIconSvg(name: string) {
     Swap: 'M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z',
     Wallet: 'M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
     Collection: 'M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z',
+    Chart: 'M3 13h2v8H3v-8zm4-4h2v12H7V9zm4 8h2v4h-2v-4zm4-12h2v16h-2V5zm4 4h2v12h-2V9z',
+    Label: 'M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z',
     User: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z',
   }
   return icons[name] || icons.Odometer

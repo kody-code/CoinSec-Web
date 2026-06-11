@@ -43,6 +43,7 @@ export interface RecordItem {
   amount: number
   remark: string
   recordTime: string
+  tagIds?: number[]
 }
 
 export interface Transfer {
@@ -68,6 +69,32 @@ export interface Statistics {
   totalIncome: number
   totalExpense: number
   categoryStats: CategoryStat[]
+}
+
+export interface Tag {
+  tagId: number
+  name: string
+  color: string
+}
+
+export interface Budget {
+  budgetId: number
+  categoryId: number
+  categoryName: string
+  budgetAmount: number
+  periodType: 'MONTHLY' | 'YEARLY'
+  periodYear: number
+  periodMonth?: number | null
+}
+
+export interface BudgetOverview {
+  budgetId: number
+  categoryId: number
+  categoryName: string
+  budgetAmount: number
+  spentAmount: number
+  remaining: number
+  percentage: number
 }
 
 export interface PageResult<T> {

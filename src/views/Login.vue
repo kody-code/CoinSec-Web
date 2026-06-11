@@ -68,10 +68,10 @@ async function handleSubmit() {
       <div class="login-brand">
         <div class="brand-icon">
           <svg viewBox="0 0 48 48" width="32" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M24 4L8 14v12c0 11 7.5 21.5 16 26 8.5-4.5 16-15 16-26V14L24 4z" fill="#fff" opacity="0.15"/>
-            <path d="M24 6L10 15v11c0 10 6.8 19.5 14 23.5 7.2-4 14-13.5 14-23.5V15L24 6z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
-            <circle cx="24" cy="26" r="10" stroke="#fff" stroke-width="1.5" fill="none"/>
-            <path d="M30 20c-1.5-1.2-3.5-2-5.5-2C19 18 15.5 21.5 15.5 26s3.5 8 9 8c2 0 4-.8 5.5-2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+            <path d="M24 4L8 14v12c0 11 7.5 21.5 16 26 8.5-4.5 16-15 16-26V14L24 4z" fill="var(--accent)" opacity="0.15"/>
+            <path d="M24 6L10 15v11c0 10 6.8 19.5 14 23.5 7.2-4 14-13.5 14-23.5V15L24 6z" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="24" cy="26" r="10" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+            <path d="M30 20c-1.5-1.2-3.5-2-5.5-2C19 18 15.5 21.5 15.5 26s3.5 8 9 8c2 0 4-.8 5.5-2" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" fill="none"/>
           </svg>
         </div>
         <h1 class="brand-title">CoinSec</h1>
@@ -154,7 +154,7 @@ async function handleSubmit() {
   justify-content: center;
   position: relative;
   overflow: hidden;
-  background: var(--sidebar-bg);
+  background: #f5f6fa;
 }
 
 .login-bg {
@@ -167,7 +167,7 @@ async function handleSubmit() {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.3;
+  opacity: 0.18;
   animation: float 20s ease-in-out infinite;
 }
 
@@ -232,37 +232,37 @@ async function handleSubmit() {
 .brand-title {
   font-size: 28px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary);
   letter-spacing: -0.5px;
   margin: 0;
 }
 
 .brand-subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   margin-top: 6px;
 }
 
 .login-card {
   width: 380px;
   padding: 32px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
+  background: #fff;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
   text-align: left;
 }
 
 .card-title {
   font-size: 20px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
 .card-desc {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary);
   margin: 0 0 24px;
 }
 
@@ -281,7 +281,7 @@ async function handleSubmit() {
 .input-label {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .input-wrapper {
@@ -290,20 +290,20 @@ async function handleSubmit() {
   gap: 10px;
   padding: 0 14px;
   height: 44px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 12px;
   transition: all 0.2s;
 }
 
 .input-wrapper:focus-within {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.08);
+  background: #fff;
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .input-icon {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-hint);
   flex-shrink: 0;
 }
 
@@ -312,13 +312,13 @@ async function handleSubmit() {
   background: none;
   border: none;
   outline: none;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 14px;
   font-family: inherit;
 }
 
 .input-field::placeholder {
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--text-hint);
 }
 
 .submit-btn {
@@ -367,7 +367,7 @@ async function handleSubmit() {
 .switch-btn {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary);
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
@@ -375,6 +375,6 @@ async function handleSubmit() {
 }
 
 .switch-btn:hover {
-  color: var(--accent-light);
+  color: var(--accent);
 }
 </style>
