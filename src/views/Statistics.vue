@@ -493,6 +493,7 @@ onMounted(fetchStats)
   font-family: inherit;
   color: var(--text-dark);
   outline: none;
+  white-space: nowrap;
   transition: border-color 0.2s;
 }
 
@@ -723,6 +724,8 @@ onMounted(fetchStats)
 @media (max-width: 768px) {
   .date-section { flex-direction: column; gap: 12px; }
   .presets { flex-wrap: wrap; }
+  .date-pickers { width: 100%; }
+  .date-input { flex: 1; min-width: 0; }
   .summary-row { grid-template-columns: 1fr; }
   .chart-grid { grid-template-columns: 1fr; }
   .card { padding: 16px; }
@@ -731,4 +734,12 @@ onMounted(fetchStats)
 .stats-page-native {
   padding: 0 16px;
 }
+.stats-page-native .date-section {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.stats-page-native .presets { flex-wrap: wrap; }
+.stats-page-native .date-pickers { width: 100%; }
+.stats-page-native .date-input { flex: 1; min-width: 0; }
 </style>

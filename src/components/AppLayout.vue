@@ -75,10 +75,6 @@ async function handleLogout() {
 
 onMounted(() => {
   window.addEventListener('resize', onResize)
-  const token = localStorage.getItem('satoken')
-  if (token && !auth.user) {
-    auth.fetchUser()
-  }
 })
 
 onUnmounted(() => {
@@ -183,10 +179,8 @@ function getIconSvg(name: string) {
 
         <div class="content-area">
           <div class="content-wrapper">
-            <router-view v-slot="{ Component }">
-              <transition name="page" mode="out-in">
-                <component :is="Component" />
-              </transition>
+            <router-view v-slot="{ Component, route }">
+              <component :is="Component" :key="route.fullPath" />
             </router-view>
           </div>
         </div>
@@ -198,10 +192,8 @@ function getIconSvg(name: string) {
   <template v-else>
     <div class="app-shell-mobile">
       <div class="mobile-content">
-        <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
-          </transition>
+        <router-view v-slot="{ Component, route }">
+          <component :is="Component" :key="route.fullPath" />
         </router-view>
       </div>
 
@@ -476,21 +468,6 @@ function getIconSvg(name: string) {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-.page-enter-active,
-.page-leave-active {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(12px);
-}
-
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
 }
 
 .sidebar-overlay {

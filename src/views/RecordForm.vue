@@ -150,8 +150,8 @@ onMounted(async () => {
         filterCategories()
       }
     }
-  } catch {
-    // 401 handled by interceptor redirect
+  } catch (e) {
+    console.error('[RecordForm] Failed to load data:', e)
   }
 })
 </script>
@@ -600,6 +600,7 @@ onMounted(async () => {
 
 .datetime-trigger {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -614,6 +615,7 @@ onMounted(async () => {
   cursor: pointer;
   transition: all 0.2s;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .datetime-trigger:hover {

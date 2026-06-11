@@ -186,8 +186,8 @@ onMounted(async () => {
     categories.value = catRes.data.data
     accounts.value = acctRes.data.data
     fetchRecords()
-  } catch {
-    // 401 handled by interceptor redirect
+  } catch (e) {
+    console.error('[Records] Failed to load data:', e)
   }
 })
 </script>
@@ -647,8 +647,8 @@ onMounted(async () => {
 .app-chip.active { background: var(--primary); color: #fff; }
 .app-records-dates { display: flex; align-items: center; gap: 6px; }
 .app-date-input {
-  flex: 1; padding: 6px 10px; border: 1px solid var(--border-light);
-  border-radius: 8px; font-size: 13px; outline: none;
+  flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--border-light);
+  border-radius: 8px; font-size: 13px; outline: none; white-space: nowrap;
   color: var(--text-primary); background: var(--card-bg);
 }
 .app-date-sep { font-size: 13px; color: var(--text-hint); }

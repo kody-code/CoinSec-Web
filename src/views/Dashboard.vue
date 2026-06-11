@@ -159,8 +159,8 @@ onMounted(async () => {
     categories.value = catRes.data.data
 
     fetchTrend()
-  } catch {
-    // 401 handled by interceptor redirect
+  } catch (e) {
+    console.error('[Dashboard] Failed to load data:', e)
   } finally {
     loading.value = false
   }
