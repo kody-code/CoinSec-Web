@@ -67,11 +67,19 @@ async function handleSubmit() {
     <div class="login-container">
       <div class="login-brand">
         <div class="brand-icon">
-          <svg viewBox="0 0 48 48" width="32" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M24 4L8 14v12c0 11 7.5 21.5 16 26 8.5-4.5 16-15 16-26V14L24 4z" fill="var(--accent)" opacity="0.15"/>
-            <path d="M24 6L10 15v11c0 10 6.8 19.5 14 23.5 7.2-4 14-13.5 14-23.5V15L24 6z" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
-            <circle cx="24" cy="26" r="10" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
-            <path d="M30 20c-1.5-1.2-3.5-2-5.5-2C19 18 15.5 21.5 15.5 26s3.5 8 9 8c2 0 4-.8 5.5-2" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          <svg viewBox="0 0 200 200" width="96" height="96" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="96" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="4"/>
+            <circle cx="100" cy="100" r="84" fill="#F0F9FF"/>
+            <rect x="40" y="44" width="54" height="112" rx="10" fill="#93C5FD"/>
+            <rect x="106" y="44" width="54" height="112" rx="10" fill="#67E8F9"/>
+            <rect x="52" y="62" width="30" height="4" rx="2" fill="#FFFFFF" opacity="0.8"/>
+            <rect x="52" y="74" width="22" height="4" rx="2" fill="#FFFFFF" opacity="0.8"/>
+            <rect x="118" y="62" width="30" height="4" rx="2" fill="#FFFFFF" opacity="0.8"/>
+            <rect x="126" y="74" width="22" height="4" rx="2" fill="#FFFFFF" opacity="0.8"/>
+            <path d="M67 98 L72 101 L72 108 Q72 116, 67 119 Q62 116, 62 108 L62 101 Z" fill="#FFFFFF" opacity="0.9"/>
+            <polyline points="64,108 67,112 72,105" fill="none" stroke="#93C5FD" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="130" y1="118" x2="130" y2="98" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+            <path d="M122 106 L130 95 L138 106" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
           </svg>
         </div>
         <h1 class="brand-title">CoinSec</h1>
@@ -215,9 +223,9 @@ async function handleSubmit() {
 }
 
 .brand-icon {
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-purple));
+  width: 112px;
+  height: 112px;
+  background: transparent;
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -226,7 +234,6 @@ async function handleSubmit() {
   font-weight: 700;
   color: #fff;
   margin: 0 auto 16px;
-  box-shadow: 0 8px 24px var(--accent-glow);
 }
 
 .brand-title {

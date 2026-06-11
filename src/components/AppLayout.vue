@@ -108,10 +108,14 @@ function getIconSvg(name: string) {
         <div class="sidebar-brand">
           <div class="brand-icon">
             <svg viewBox="0 0 48 48" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M24 4L8 14v12c0 11 7.5 21.5 16 26 8.5-4.5 16-15 16-26V14L24 4z" fill="#fff" opacity="0.15"/>
-              <path d="M24 6L10 15v11c0 10 6.8 19.5 14 23.5 7.2-4 14-13.5 14-23.5V15L24 6z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
-              <circle cx="24" cy="26" r="10" stroke="#fff" stroke-width="1.5" fill="none"/>
-              <path d="M30 20c-1.5-1.2-3.5-2-5.5-2C19 18 15.5 21.5 15.5 26s3.5 8 9 8c2 0 4-.8 5.5-2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+              <circle cx="24" cy="24" r="16" stroke="#fff" stroke-width="1.2" fill="#fff" opacity="0.08"/>
+              <circle cx="24" cy="24" r="13" stroke="#fff" stroke-width="0.8" fill="none" opacity="0.25"/>
+              <rect x="15.5" y="14" width="7.5" height="20" rx="1.5" fill="#fff" opacity="0.6"/>
+              <rect x="25" y="14" width="7.5" height="20" rx="1.5" fill="#fff" opacity="0.45"/>
+              <path d="M19 28.5 L20.2 29.2 L20.2 30.8 Q20.2 32, 19 32.5 Q17.8 32, 17.8 30.8 L17.8 29.2 Z" stroke="#fff" stroke-width="0.9" fill="none" stroke-linejoin="round"/>
+              <polyline points="17.5,30.5 18.8,32 20.5,29.5" stroke="#fff" stroke-width="0.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="29" y1="31" x2="29" y2="27" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M27 28.5 L29 26.5 L31 28.5" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             </svg>
           </div>
           <transition name="fade">
